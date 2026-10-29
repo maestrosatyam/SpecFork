@@ -15,3 +15,9 @@ submission/video/build/
 oss/NeMo-Agent-Toolkit/
 web/screenshots/raw/
 web/screenshots/
+submission/video/footage/
+submission/video/build/
+submission/video/audio/
+submission/video/*.wav
+submission/video/*.mp4
+submission/video/qa/frames/
