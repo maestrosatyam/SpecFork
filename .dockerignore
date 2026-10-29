@@ -1,0 +1,12 @@
+.git
+.venv
+.env
+**/node_modules
+web/dist
+submission
+oss
+evidence
+research
+evals
+tests
+**/__pycache__

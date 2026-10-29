@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+dist/
+.pytest_cache/
+.ruff_cache/
+*.log
+submission/video/footage/raw/
+submission/video/build/
+.DS_Store
+oss/NeMo-Agent-Toolkit/
+web/screenshots/raw/

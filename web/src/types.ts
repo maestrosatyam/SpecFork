@@ -1,0 +1,141 @@
+// Mirrors docs/API_CONTRACT.md (v1). Keep in sync with the backend.
+
+export type Preset = { id: string; title: string; spec: string; tagline: string; sample_run_id?: string };
+
+export type RunStatus = "running" | "awaiting_answers" | "resolving" | "resolved" | "converging" | "error";
+export type Stage = "frame" | "fanout" | "execute" | "cluster" | "explain" | "done";
+
+export type Param = { name: string; type: string; description: string };
+export type Signature = {
+  name: string;
+  params: Param[];
+  returns: { type: string; description: string };
+  docstring: string;
+};
+
+export type ProbeInput = { id: string; args: Record<string, unknown>; source: "model" | "fuzz"; note?: string };
+
+export type Outcome = {
+  ok: boolean;
+  value_repr: string;
+  error_type?: string;
+  error_msg?: string;
+};
+
+export type ImplStatus = "pending" | "generated" | "rejected" | "executed" | "error";
+
+export type Implementation = {
+  id: string;
+  index: number;
+  model: string;
+  status: ImplStatus;
+  code?: string;
+  reject_reason?: string;
+  cluster_id?: string;
+  outcomes?: Record<string, Outcome>;
+};
+
+export type Cluster = {
+  id: string;
+  label: string;
+  impl_ids: string[];
+  size: number;
+  share: number;
+  representative_impl_id: string;
+  kind: "behavior" | "crash";
+  summary?: string;
+};
+
+export type QuestionOption = {
+  id: string;
+  label: string;
+  cluster_ids: string[];
+  examples: { input_id: string; value_repr: string }[];
+};
+
+export type Question = {
+  id: string;
+  text: string;
+  why: string;
+  kind: "ambiguity" | "likely_bug";
+  witness_input_ids: string[];
+  options: QuestionOption[];
+  answer_option_id?: string;
+};
+
+export type CallRecord = {
+  purpose: string;
+  model: string;
+  thinking: boolean;
+  latency_s: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  ok: boolean;
+  error?: string;
+  request_id?: string;
+  started_at: number;
+  reasoning_excerpt?: string;
+};
+
+export type Convergence = {
+  n: number;
+  passed: number;
+  agreement_after: number;
+  clusters_after: number;
+  status: "running" | "done" | "error";
+};
+
+export type Resolution = {
+  answers: Record<string, string>;
+  surviving_cluster_ids: string[];
+  chosen_impl_id: string;
+  clarified_spec: string;
+  decisions: string[];
+  tests_code: string;
+  reference_code: string;
+  locked_cases: { input_id: string; args: Record<string, unknown>; expected_repr: string }[];
+  agreement_before: number;
+  convergence?: Convergence;
+};
+
+export type LogLine = { t: number; stage: Stage | "resolve" | "converge"; msg: string };
+
+export type Run = {
+  id: string;
+  created_at: number;
+  updated_at: number;
+  status: RunStatus;
+  stage: Stage;
+  error?: string;
+  spec: string;
+  preset_id?: string;
+  is_sample: boolean;
+  settings: { n_samples: number; fast_model: string; deep_model: string };
+  signature?: Signature;
+  inputs: ProbeInput[];
+  implementations: Implementation[];
+  clusters: Cluster[];
+  questions: Question[];
+  resolution?: Resolution;
+  trace: CallRecord[];
+  metrics: {
+    total_cost_usd: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    n_calls: number;
+    wall_time_s: number;
+  };
+  log: LogLine[];
+};
+
+export type RunSummary = {
+  id: string;
+  created_at: number;
+  status: RunStatus;
+  spec: string;
+  n_clusters: number;
+  is_sample: boolean;
+};
+
+export type Health = { ok: boolean; llm_configured: boolean; models: { fast: string; deep: string }; version: string };

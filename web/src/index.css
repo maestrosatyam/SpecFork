@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-ink-950: #070b17;
+  --color-ink-900: #0b1020;
+  --color-ink-850: #0f152a;
+  --color-ink-800: #131a33;
+  --color-ink-700: #1a2342;
+  --color-ink-600: #243055;
+  --color-ink-500: #34416b;
+  --color-fog-50: #f4f6fb;
+  --color-fog-100: #e7ecf5;
+  --color-fog-200: #d5dbea;
+  --color-fog-300: #c3cbe0;
+  --color-fog-400: #9aa6c2;
+  --color-fog-500: #7a87a8;
+  --color-accent: #a5b4fc;
+  --color-accent-strong: #c7d0ff;
+  --color-add: #34d399;
+  --color-warn: #f5a524;
+  --color-danger: #f87171;
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-ink-900 text-fog-100 font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+    min-height: 100vh;
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, rgba(86, 180, 233, 0.09), transparent 60%),
+      radial-gradient(900px 500px at 95% 0%, rgba(165, 180, 252, 0.08), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(165, 180, 252, 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-white/[0.07] bg-ink-850/80 shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset,0_20px_40px_-24px_rgba(0,0,0,0.6)] backdrop-blur-sm;
+  }
+  .eyebrow {
+    @apply font-display text-[12px] font-semibold uppercase tracking-[0.16em] text-fog-400;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-semibold transition-[background-color,color,box-shadow,opacity,transform] duration-150 select-none;
+  }
+  .btn-primary {
+    @apply bg-fog-50 text-ink-900 hover:bg-white active:translate-y-px disabled:opacity-40 disabled:hover:bg-fog-50 shadow-[0_0_0_1px_rgba(255,255,255,0.4),0_8px_24px_-8px_rgba(165,180,252,0.45)];
+  }
+  .btn-ghost {
+    @apply border border-white/10 bg-white/[0.03] text-fog-100 hover:bg-white/[0.07] hover:border-white/20 disabled:opacity-40;
+  }
+  .btn-quiet {
+    @apply px-2.5 py-1.5 text-fog-300 hover:text-fog-50 hover:bg-white/[0.06];
+  }
+  .kbd {
+    @apply rounded-md border border-current/25 px-1.5 py-0.5 font-mono text-[11px] leading-none opacity-70;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[13px] text-fog-300;
+  }
+  .mono {
+    @apply font-mono;
+    font-feature-settings: "calt" 0;
+  }
+  .stripes {
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(229, 72, 77, 0.95) 0 6px,
+      rgba(120, 128, 150, 0.85) 6px 12px
+    );
+  }
+  .stripes-soft {
+    background-image: repeating-linear-gradient(
+      135deg,
+      rgba(229, 72, 77, 0.55) 0 5px,
+      rgba(120, 128, 150, 0.45) 5px 10px
+    );
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 250% 0;
+  }
+}
+.shimmer {
+  background-image: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.07) 50%, transparent 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer,
+  .pulse-dot {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
