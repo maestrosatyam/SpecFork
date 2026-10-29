@@ -22,6 +22,16 @@ except Exception:  # pragma: no cover - non-POSIX
 
 sys.setrecursionlimit(2000)
 
+# best effort: drop network access by entering fresh user+network namespaces (works where
+# unprivileged user namespaces are allowed; harmless no-op elsewhere)
+try:
+    import os as _os_mod
+
+    _os_mod.unshare(_os_mod.CLONE_NEWUSER | _os_mod.CLONE_NEWNET)
+    NET_ISOLATED = True
+except Exception:
+    NET_ISOLATED = False
+
 # canonicalisation (kept in sync with app/canon.py; imported lazily before builtins are restricted)
 import datetime as _dt  # noqa: E402
 import decimal as _decimal  # noqa: E402
@@ -90,10 +100,35 @@ def main():
         except Exception:
             pass
 
+    import types as _types
+
+    deny = {("operator", "attrgetter"), ("operator", "methodcaller"), ("string", "Formatter"),
+            ("random", "SystemRandom")}
+    proxies = {}
+
+    def proxy(mod):
+        """A copy of the module exposing only public, non-module attributes (no `random._os`, `typing.sys`...)."""
+        p = proxies.get(mod.__name__)
+        if p is None:
+            p = _types.ModuleType(mod.__name__)
+            for k in dir(mod):
+                if k.startswith("_") or (mod.__name__, k) in deny:
+                    continue
+                try:
+                    v = getattr(mod, k)
+                except Exception:
+                    continue
+                if isinstance(v, _types.ModuleType):
+                    continue
+                setattr(p, k, v)
+            proxies[mod.__name__] = p
+        return p
+
     def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if level or name.split(".")[0] not in allowed:
+        top = name.split(".")[0]
+        if level or top not in allowed or "." in name:
             raise ImportError(f"import of {name} blocked")
-        return real_import(name, globals, locals, fromlist, level)
+        return proxy(real_import(name, globals, locals, fromlist, level))
 
     safe_builtins = {
         k: getattr(builtins, k)

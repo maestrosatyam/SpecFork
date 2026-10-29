@@ -36,6 +36,21 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
+
+def _harden_process() -> None:
+    """Make /proc/<pid>/environ and memory of this server unreadable to the sandboxed children
+    (they run as the same uid). PR_SET_DUMPABLE=0 re-owns /proc/<pid>/* to root."""
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.prctl(4, 0, 0, 0, 0)  # PR_SET_DUMPABLE = 4
+    except Exception:  # noqa: BLE001 - non-Linux dev machines
+        pass
+
+
+_harden_process()
+
 app = FastAPI(title="SpecFork", version=VERSION)
 store = RunStore(os.environ.get("RUNS_DIR", "/tmp/specfork-runs"))
 limiter = RateLimiter(
@@ -43,7 +58,7 @@ limiter = RateLimiter(
     window_s=float(os.environ.get("RATE_LIMIT_WINDOW_S", "600")),
     daily_budget_usd=float(os.environ.get("DAILY_BUDGET_USD", "5")),
 )
-client = NebiusClient(api_key=os.environ.get("NEBIUS_API_KEY", ""),
+client = NebiusClient(api_key=os.environ.pop("NEBIUS_API_KEY", ""),  # keep the key out of os.environ
                       max_concurrency=int(os.environ.get("LLM_CONCURRENCY", "16")))
 _tasks: set[asyncio.Task[Any]] = set()
 

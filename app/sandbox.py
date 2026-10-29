@@ -32,6 +32,14 @@ BANNED_NAMES = {
     "vars", "memoryview", "help", "exit", "quit", "getattr", "setattr", "delattr", "__builtins__",
     "__loader__", "__spec__",
 }
+# attribute names that lead from ordinary objects to frames, code objects, globals or modules
+BANNED_ATTRS = {
+    "gi_frame", "gi_code", "gi_yieldfrom", "cr_frame", "cr_code", "ag_frame", "ag_code", "f_globals", "f_locals",
+    "f_builtins", "f_back", "f_code", "tb_frame", "tb_next", "func_globals", "mro", "format_map",
+    "attrgetter", "methodcaller", "Formatter", "sys", "os", "builtins", "modules", "subprocess", "importlib",
+    "posix", "io", "socket", "shutil", "ctypes", "inspect", "types", "gc", "system", "popen", "spawn",
+    "load_module", "exec_module", "get_data",
+}
 MAX_CODE_CHARS = 12_000
 HARNESS = Path(__file__).with_name("_harness.py")
 
@@ -58,8 +66,13 @@ def check_code(code: str, func_name: str) -> StaticCheck:
                     return StaticCheck(False, f"import of '{m}' is not allowed")
             if isinstance(node, ast.ImportFrom) and node.level:
                 return StaticCheck(False, "relative import not allowed")
-        elif isinstance(node, ast.Attribute) and node.attr.startswith("__"):
-            return StaticCheck(False, f"dunder attribute '{node.attr}' not allowed")
+        elif isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+            return StaticCheck(False, f"private/dunder attribute '{node.attr}' not allowed")
+        elif isinstance(node, ast.Attribute) and node.attr in BANNED_ATTRS:
+            return StaticCheck(False, f"attribute '{node.attr}' not allowed")
+        elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "format"
+              and not (isinstance(node.func.value, ast.Constant) and isinstance(node.func.value.value, str))):
+            return StaticCheck(False, "str.format on a non-literal template is not allowed")
         elif isinstance(node, ast.Name) and (node.id in BANNED_NAMES or node.id.startswith("__")):
             if not (node.id == "__name__" and isinstance(node.ctx, ast.Load)):
                 return StaticCheck(False, f"name '{node.id}' not allowed")
@@ -67,9 +80,10 @@ def check_code(code: str, func_name: str) -> StaticCheck:
             return StaticCheck(False, "global/nonlocal not allowed")
         elif isinstance(node, (ast.AsyncFunctionDef, ast.Await, ast.AsyncFor, ast.AsyncWith)):
             return StaticCheck(False, "async code not allowed")
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and "__" in node.value and len(node.value) < 64:
-            if any(tok in node.value for tok in ("__class__", "__subclasses__", "__globals__", "__builtins__", "__import__")):
-                return StaticCheck(False, "suspicious dunder string")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and "__" in node.value:
+            return StaticCheck(False, "suspicious dunder string")
+        elif isinstance(node, ast.alias) and (node.name.startswith("_") or node.name in BANNED_ATTRS):
+            return StaticCheck(False, f"import of name '{node.name}' not allowed")
         if isinstance(node, ast.FunctionDef) and node.name == func_name:
             found = True
     # top level may only contain imports, defs, simple constant assignments and docstrings

@@ -22,6 +22,14 @@ Reply with JSON only, no prose:
  "returns": {"type": str, "description": str},
  "inputs": [{"args": {<param>: <value>}, "note": "why this probe is interesting"}]}"""
 
+FRAME_INPUTS_SYSTEM = """You prepare natural-language function specs for differential testing.
+The function signature is fixed (given below). Produce 14-18 probe inputs (keyword arguments as JSON)
+that a careful tester would try: typical cases AND the edge cases where reasonable developers might
+implement the spec differently (boundaries and ties, empty values, zero, rounding, case and whitespace,
+unicode, ordering, duplicates, leap years, inclusive/exclusive ranges, plausible-but-unusual values).
+Every input must be valid JSON and match the parameter names and types exactly.
+Reply with JSON only: {"inputs": [{"args": {<param>: <value>}, "note": "why this probe is interesting"}]}"""
+
 IMPLEMENT_SYSTEM = """You are a senior Python developer. Implement the requested function.
 Where the spec is silent or unclear, make the choice you personally consider most reasonable:
 do not ask questions, do not hedge, do not add parameters, do not explain.
@@ -67,7 +75,9 @@ def implement_user(spec: str, sig: dict[str, Any]) -> str:
     )
 
 
-def frame_user(spec: str) -> str:
+def frame_user(spec: str, sig: dict[str, Any] | None = None) -> str:
+    if sig:
+        return f"Spec:\n{spec.strip()}\n\nFixed signature:\n```python\n{signature_stub(sig)}\n```"
     return f"Spec:\n{spec.strip()}"
 
 

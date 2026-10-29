@@ -90,6 +90,7 @@ class MockServer {
     const run: Run = {
       ...clone(final),
       created_at: t0,
+      updated_at: t0,
       status: "running",
       stage: "frame",
       signature: undefined,

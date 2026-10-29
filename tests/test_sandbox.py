@@ -105,3 +105,49 @@ async def test_args_are_copied_between_calls():
     code = "def f(xs):\n    xs.append(1)\n    return len(xs)\n"
     res = await run_function(code, "f", [{"id": "a", "args": {"xs": []}}, {"id": "b", "args": {"xs": []}}])
     assert res.outcomes["a"]["value_repr"] == res.outcomes["b"]["value_repr"] == "1"
+
+
+# ---- regression tests for known CPython sandbox-escape gadgets (static layer)
+@pytest.mark.parametrize("code", [
+    "import random\ndef f(x): return random._os.getcwd()",
+    "import typing\ndef f(x): return typing.sys.modules",
+    "import dataclasses\ndef f(x): return dataclasses.sys",
+    "import operator\ndef f(x): return operator.attrgetter('_' + '_class__')(x)",
+    "from operator import attrgetter\ndef f(x): return attrgetter('a')(x)",
+    "def f(x):\n    t = '{0._' + '_class__}'\n    return t.format(x)",
+    "def f(x):\n    g = (i for i in [1])\n    return g.gi_frame.f_globals",
+    "def f(x): return type(x).mro()",
+    "import string\ndef f(x): return string.Formatter().format('{0}', x)",
+    "def f(x):\n    try:\n        1/0\n    except Exception as e:\n        return e.__traceback__.tb_frame",
+    "from random import _os\ndef f(x): return _os",
+])
+def test_escape_gadgets_rejected_statically(code):
+    assert not check_code(code, "f").ok
+
+
+# ---- runtime layer: even if code got past the static check, the module proxies hide internals
+async def test_runtime_module_proxies_hide_internals():
+    for code in [
+        "import random\ndef f(x):\n    return hasattr(random, '_os') or hasattr(random, 'os')\n",
+        "import typing\ndef f(x):\n    return hasattr(typing, 'sys')\n",
+        "import operator\ndef f(x):\n    return hasattr(operator, 'attrgetter')\n",
+        "import string\ndef f(x):\n    return hasattr(string, 'Formatter')\n",
+    ]:
+        res = await run_function(code, "f", [{"id": "a", "args": {"x": 1}}])
+        assert res.ok and res.outcomes["a"]["value_repr"] == "False", (code, res)
+
+
+async def test_legit_stdlib_usage_still_works():
+    code = (
+        "import math, statistics, datetime, re\n"
+        "from collections import Counter\n"
+        "from decimal import Decimal, ROUND_HALF_UP\n"
+        "def f(x):\n"
+        "    d = datetime.date.fromisoformat('2024-02-29') + datetime.timedelta(days=1)\n"
+        "    q = Decimal('2.675').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)\n"
+        "    return [math.floor(2.5), statistics.median([1, 2, 3, 4]), d.isoformat(), float(q),\n"
+        "            Counter('aab').most_common(1)[0][0], re.sub(r'\\s+', ' ', 'a  b'), '{:.2f}'.format(1/3)]\n"
+    )
+    assert check_code(code, "f").ok
+    res = await run_function(code, "f", [{"id": "a", "args": {"x": 1}}])
+    assert res.outcomes["a"] == {"ok": True, "value_repr": "[2, 2.5, '2024-03-01', 2.68, 'a', 'a b', '0.33']"}

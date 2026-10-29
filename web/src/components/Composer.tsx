@@ -95,7 +95,7 @@ export function Composer({
           <span className="inline-block h-px w-8 bg-fog-500/60" aria-hidden />
           Ambiguity finder for coding agents
         </p>
-        <h1 className="max-w-[920px] font-display text-[38px] font-bold leading-[1.06] tracking-[-0.03em] text-fog-50 sm:text-[56px]">
+        <h1 className="max-w-[1120px] font-display text-[38px] font-bold leading-[1.06] tracking-[-0.03em] text-fog-50 sm:text-[56px]">
           Your spec means more than one thing.
           <span className="block text-fog-400">Find out which, before your coding agent guesses.</span>
         </h1>

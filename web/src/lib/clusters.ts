@@ -53,7 +53,8 @@ export function activeClusterIds(questions: Question[], answers: Record<string, 
     const opt = q.options.find((o) => o.id === optId);
     if (!opt) continue;
     const ids = new Set(opt.cluster_ids);
-    active = active === null ? ids : new Set([...active].filter((id) => ids.has(id)));
+    const prev: Set<string> | null = active;
+    active = prev === null ? ids : new Set([...prev].filter((id: string) => ids.has(id)));
   }
   return active;
 }

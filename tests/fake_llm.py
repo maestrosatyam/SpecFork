@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import httpx
 
@@ -67,6 +68,16 @@ def make_transport(counter: dict | None = None) -> httpx.MockTransport:
         elif "rewrite a function spec" in system:
             content = json.dumps({"clarified_spec": "Split a restaurant bill evenly among n people... Clarified: leftover cents go to the first people.",
                                   "decisions": ["Leftover cents go one each to the first people."]})
+            reasoning = None
+        elif "clarifying questions you would ask" in system:
+            content, reasoning = json.dumps({"questions": ["What happens to leftover cents?"]}), "think"
+        elif "product owner who wrote" in system:
+            user = body["messages"][1]["content"]
+            if "Options:" in user:
+                ids = re.findall(r'"id": "(q[0-9]+g[0-9]+)"', user)
+                content = json.dumps({"option": ids[0] if ids else "none"})
+            else:
+                content = json.dumps({"answers": [{"question": "What happens to leftover cents?", "answer": "first people pay extra"}]})
             reasoning = None
         else:
             return httpx.Response(400, text="unexpected prompt")

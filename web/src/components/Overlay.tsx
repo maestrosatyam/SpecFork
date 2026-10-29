@@ -3,13 +3,16 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { IconX } from "./Icons";
 
 function useOverlayBehaviour(open: boolean, onClose: () => void, panelRef: React.RefObject<HTMLDivElement | null>) {
+  // Keep the latest onClose without re-running the effect (parents re-render on every live snapshot).
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        closeRef.current();
       }
       if (e.key === "Tab" && panelRef.current) {
         const f = panelRef.current.querySelectorAll<HTMLElement>(
@@ -36,7 +39,7 @@ function useOverlayBehaviour(open: boolean, onClose: () => void, panelRef: React
       document.body.style.overflow = overflow;
       prev?.focus?.();
     };
-  }, [open, onClose, panelRef]);
+  }, [open, panelRef]);
 }
 
 export function Drawer({

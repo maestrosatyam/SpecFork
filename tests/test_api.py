@@ -71,7 +71,8 @@ async def test_validation_and_limits(api):
     codes = [(await api.post("/api/runs", json={"spec": SPEC, "n_samples": 4})).status_code for _ in range(4)]
     assert codes[:3] == [200, 200, 200] and codes[3] == 429
     await asyncio.wait_for(asyncio.gather(*list(main._tasks)), timeout=30)  # let background runs finish
-    assert (await api.get("/api/runs/../../etc/passwd")).status_code == 404
+    trav = await api.get("/api/runs/../../etc/passwd")
+    assert "root:" not in trav.text  # normalised to the SPA (or 404), never the file
     assert (await api.get("/api/runs/nope")).status_code == 404
 
 

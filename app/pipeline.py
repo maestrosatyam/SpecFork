@@ -239,9 +239,11 @@ class SpecFork:
     async def frame(self, run: dict[str, Any]) -> None:
         run["stage"] = "frame"
         self._log(run, "frame", f"Framing the spec with {run['settings']['fast_model']}")
-        raw = await self._json_call(run, "frame", prompts.FRAME_SYSTEM, prompts.frame_user(run["spec"]),
+        fixed = run.get("signature")
+        system = prompts.FRAME_INPUTS_SYSTEM if fixed else prompts.FRAME_SYSTEM
+        raw = await self._json_call(run, "frame", system, prompts.frame_user(run["spec"], fixed),
                                     model=run["settings"]["fast_model"], thinking=True, max_tokens=6000, temperature=0.4)
-        sig = validate_signature(raw)
+        sig = validate_signature(fixed) if fixed else validate_signature(raw)
         model_inputs = validate_inputs(raw.get("inputs") or [], sig, "model")
         fz = validate_inputs(fuzz_inputs(sig, run["spec"]), sig, "fuzz")
         seen = {json.dumps(i["args"], sort_keys=True) for i in model_inputs}
