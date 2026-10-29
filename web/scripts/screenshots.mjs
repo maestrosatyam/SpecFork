@@ -68,7 +68,7 @@ async function desktop(browser) {
   await page.click("button:has-text('Lock it in')");
   await sleep(700);
   await shot(page, "d09-resolving");
-  await page.waitForSelector("text=Clarified spec", { timeout: 15000 });
+  await page.waitForSelector("text=Agreement with your intent", { timeout: 15000 });
   await sleep(1800);
   await shot(page, "d10-resolved");
 

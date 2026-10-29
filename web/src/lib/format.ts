@@ -1,12 +1,15 @@
 // Pure formatting helpers (unit-tested in format.test.ts).
 
-/** "$0.0042" style: 4 decimals under a dollar (min 1 significant digit), 2 decimals above. */
+/**
+ * "$0.0042" style. ≥ $1: 2 decimals; ≥ $0.001: 4 decimals; smaller: 6 decimals (so per-call costs like
+ * $0.000086 stay readable instead of rounding to $0.0001).
+ */
 export function formatCost(usd: number | undefined | null): string {
-  if (usd == null || !Number.isFinite(usd)) return "$0.0000";
-  if (usd === 0) return "$0.0000";
-  if (Math.abs(usd) >= 1) return `$${usd.toFixed(2)}`;
-  if (Math.abs(usd) < 0.0001) return `$${usd.toFixed(6)}`;
-  return `$${usd.toFixed(4)}`;
+  if (usd == null || !Number.isFinite(usd) || usd === 0) return "$0.0000";
+  const a = Math.abs(usd);
+  if (a >= 1) return `$${usd.toFixed(2)}`;
+  if (a >= 0.001) return `$${usd.toFixed(4)}`;
+  return `$${usd.toFixed(6)}`;
 }
 
 /** 950 -> "950", 41234 -> "41.2k", 1_250_000 -> "1.25M" */
@@ -72,8 +75,35 @@ export function pyRepr(v: unknown): string {
   return String(v);
 }
 
-/** split_bill(total=100.0, n=3) — keyword form keeps it readable regardless of param order. */
-export function formatCall(fnName: string | undefined, args: Record<string, unknown>): string {
+/** Python repr for a value whose declared type is known (JSON loses the 100.0 vs 100 distinction). */
+export function pyReprTyped(v: unknown, type?: string): string {
+  if (typeof v === "number" && Number.isInteger(v) && type && /^(float|Optional\[float\]|float \| None)$/.test(type.trim()))
+    return `${v}.0`;
+  return pyRepr(v);
+}
+
+/**
+ * Render a call. With the signature's params, uses positional args in declared order — split_bill(100.0, 3) —
+ * and float-aware reprs. Without (or when args don't match the params), falls back to keyword form.
+ */
+export function formatCall(
+  fnName: string | undefined,
+  args: Record<string, unknown>,
+  params?: { name: string; type: string }[],
+): string {
+  const keys = Object.keys(args);
+  if (params && params.length && keys.every((k) => params.some((p) => p.name === k))) {
+    const parts: string[] = [];
+    let skipped = false;
+    for (const p of params) {
+      if (!(p.name in args)) {
+        skipped = true;
+        continue;
+      }
+      parts.push(skipped ? `${p.name}=${pyReprTyped(args[p.name], p.type)}` : pyReprTyped(args[p.name], p.type));
+    }
+    return `${fnName || "fn"}(${parts.join(", ")})`;
+  }
   const parts = Object.entries(args).map(([k, v]) => `${k}=${pyRepr(v)}`);
   return `${fnName || "fn"}(${parts.join(", ")})`;
 }

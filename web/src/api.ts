@@ -43,7 +43,9 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     let detail = res.statusText || `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      if (body?.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      if (typeof body?.detail === "string") detail = body.detail;
+      else if (Array.isArray(body?.detail) && body.detail[0]?.msg) detail = String(body.detail[0].msg); // FastAPI 422
+      else if (body?.detail) detail = JSON.stringify(body.detail);
     } catch {
       /* non-JSON error body */
     }

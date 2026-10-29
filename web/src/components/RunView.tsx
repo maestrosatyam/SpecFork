@@ -177,9 +177,11 @@ export function RunView({
   }
   if (!run) return <RunSkeleton />;
 
+  // The live server rejects answers/converge on recorded sample runs (409); mock mode lets you click through.
+  const recorded = run.is_sample && api.mode === "live";
   const amb = ambiguityQuestions(run.questions);
   const answeredCount = amb.filter((q) => answers[q.id]).length;
-  const showMeanings = run.clusters.length > 0 && run.questions.length > 0;
+  const showMeanings = run.clusters.length > 0 && (run.questions.length > 0 || run.status !== "running");
   const executed = run.implementations.filter((i) => i.status === "executed").length;
   const rejected = run.implementations.filter((i) => i.status === "rejected").length;
   const written = run.implementations.filter((i) => i.status !== "pending").length;
@@ -277,13 +279,6 @@ export function RunView({
             </div>
           )}
 
-          {run.status !== "error" && run.stage === "done" && run.clusters.length > 0 && run.questions.length === 0 && (
-            <div className="card p-6">
-              <h2 className="font-display text-[26px] font-semibold text-fog-50">No ambiguity found</h2>
-              <p className="mt-2 text-fog-300">Every implementation behaved identically on every probe input. Your spec is already pinned down.</p>
-            </div>
-          )}
-
           <AnimatePresence>
             {showMeanings && (
               <motion.div
@@ -313,7 +308,7 @@ export function RunView({
                   />
                 ))}
                 <LikelyBugs run={run} styles={styles} />
-                {amb.length > 0 && (
+                {run.status !== "error" && (
                   <LockBar
                     answered={answeredCount}
                     total={amb.length}
@@ -321,6 +316,7 @@ export function RunView({
                     locked={locked && run.status !== "resolving"}
                     error={lockErr}
                     onLock={lock}
+                    recordedOnForkLive={recorded ? () => onForkSpec(run.spec) : undefined}
                   />
                 )}
               </motion.div>
@@ -347,7 +343,14 @@ export function RunView({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45 }}
             >
-              <ResolutionView api={api} run={run} busy={convBusy} error={convErr} onConverge={converge} />
+              <ResolutionView
+                api={api}
+                run={run}
+                busy={convBusy}
+                error={convErr}
+                onConverge={recorded ? () => onForkSpec(run.spec) : converge}
+                convergeLabel={recorded ? "Fork it live" : undefined}
+              />
             </motion.div>
           )}
 

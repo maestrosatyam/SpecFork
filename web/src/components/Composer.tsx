@@ -32,9 +32,56 @@ export function describeCreateError(e: unknown): ErrorInfo {
 export function validateSpec(spec: string): string | null {
   const t = spec.trim();
   if (!t) return "Write a one- or two-sentence description of the function you want.";
-  if (t.length < 8) return "That's a bit short. Describe what the function should do.";
+  if (t.length < 10) return "That's a bit short. Describe what the function should do.";
   if (spec.length > MAX_SPEC_CHARS) return `Keep it under ${MAX_SPEC_CHARS.toLocaleString()} characters (currently ${spec.length.toLocaleString()}).`;
   return null;
+}
+
+const HERO_ROWS = [
+  { label: "A", color: "#56B4E9", out: "[33.34, 33.33, 33.33]", n: 12 },
+  { label: "B", color: "#F5A524", out: "[33.33, 33.33, 33.33]", n: 6 },
+  { label: "C", color: "#2FC79E", out: "[33.34, 33.34, 33.34]", n: 4 },
+];
+
+/** Tiny illustration of the core idea: one input, several defensible answers. */
+function HeroExample() {
+  return (
+    <motion.figure
+      className="card hidden p-5 xl:block"
+      initial={{ opacity: 0, x: 12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.5, delay: 0.15 }}
+      aria-label="Example: three implementations of the same spec disagree"
+    >
+      <figcaption className="eyebrow">Same spec, same input</figcaption>
+      <div className="mono mt-3 text-[15px] text-fog-100">
+        split_bill(<span className="text-[#F5B86B]">100.0</span>, <span className="text-[#F5B86B]">3</span>)
+      </div>
+      <ul className="mt-3 space-y-2">
+        {HERO_ROWS.map((r, i) => (
+          <motion.li
+            key={r.label}
+            className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-ink-950/60 px-3 py-2.5"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 + i * 0.15 }}
+          >
+            <span
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md font-display text-[14px] font-bold text-ink-950"
+              style={{ background: r.color }}
+            >
+              {r.label}
+            </span>
+            <span className="mono flex-1 text-[14px] text-fog-50">{r.out}</span>
+            <span className="text-[12.5px] tabular-nums text-fog-400">{r.n} impl.</span>
+          </motion.li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[13.5px] leading-snug text-fog-400">
+        Three readings of “evenly, rounding to cents”, all plausible. SpecFork makes you pick one before your agent does.
+      </p>
+    </motion.figure>
+  );
 }
 
 export function Composer({
@@ -45,6 +92,7 @@ export function Composer({
   onCreated,
   onOpenRun,
   initialSpec = "",
+  liveDisabled = false,
 }: {
   api: Api;
   presets: Preset[] | null;
@@ -53,6 +101,7 @@ export function Composer({
   onCreated: (id: string) => void;
   onOpenRun: (id: string) => void;
   initialSpec?: string;
+  liveDisabled?: boolean;
 }) {
   const [spec, setSpec] = useState(initialSpec);
   const [presetId, setPresetId] = useState<string | undefined>();
@@ -89,22 +138,30 @@ export function Composer({
   const others = recent.filter((r) => !r.is_sample).slice(0, 4);
 
   return (
-    <div className="mx-auto max-w-[1180px] px-4 pb-24 pt-10 sm:px-6 sm:pt-16 lg:px-10">
+    <div className="mx-auto max-w-[1400px] px-4 pb-24 pt-10 sm:px-6 sm:pt-16 lg:px-10">
+      <div className="grid items-center gap-10 xl:grid-cols-[minmax(0,1fr)_380px]">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <p className="eyebrow mb-4 flex items-center gap-2">
           <span className="inline-block h-px w-8 bg-fog-500/60" aria-hidden />
           Ambiguity finder for coding agents
         </p>
-        <h1 className="max-w-[1120px] font-display text-[38px] font-bold leading-[1.06] tracking-[-0.03em] text-fog-50 sm:text-[56px]">
+        <h1 className="font-display text-[34px] font-bold leading-[1.06] tracking-[-0.03em] text-fog-50 sm:text-[50px]">
           Your spec means more than one thing.
           <span className="block text-fog-400">Find out which, before your coding agent guesses.</span>
         </h1>
+        <p className="chip mt-4 md:hidden">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#76b900]" aria-hidden />
+          Powered by NVIDIA Nemotron on Nebius Token Factory
+        </p>
         <p className="mt-5 max-w-[760px] text-[17px] leading-relaxed text-fog-300">
           SpecFork has NVIDIA Nemotron write a couple of dozen independent implementations of your spec, runs them all,
           and turns every disagreement into one concrete question. You answer, and you get a clarified spec, tests
           and a reference implementation.
         </p>
       </motion.div>
+
+        <HeroExample />
+      </div>
 
       <motion.form
         className="card mt-9 p-4 sm:p-6"
@@ -236,6 +293,12 @@ export function Composer({
           </button>
         </div>
 
+        {liveDisabled && !error && (
+          <p className="mt-4 flex items-center gap-2 rounded-xl border border-warn/25 bg-warn/[0.06] px-4 py-3 text-[14.5px] text-fog-300">
+            <IconAlert className="shrink-0 text-warn" size={18} />
+            Live inference isn't configured on this server right now. Recorded sample runs still work.
+          </p>
+        )}
         {error && (
           <div
             role="alert"

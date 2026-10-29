@@ -5,11 +5,12 @@ import type { CallRecord, Run } from "../types";
 import { IconBrain, IconChevron, IconTerminal } from "./Icons";
 import { Drawer } from "./Overlay";
 
-function Stat({ label, value, big = false }: { label: string; value: string; big?: boolean }) {
+function Stat({ label, value, big = false, sub }: { label: string; value: string; big?: boolean; sub?: string }) {
   return (
     <div className="min-w-0">
       <div className="text-[12px] font-medium uppercase tracking-wider text-fog-500">{label}</div>
       <div className={`font-display font-semibold tabular-nums text-fog-50 ${big ? "text-[26px]" : "text-[20px]"}`}>{value}</div>
+      {sub && <div className="text-[12.5px] tabular-nums text-fog-400">{sub}</div>}
     </div>
   );
 }
@@ -107,7 +108,12 @@ export function TraceDrawer({ run, open, onClose }: { run: Run; open: boolean; o
     >
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:grid-cols-4">
         <Stat big label="Total cost" value={formatCost(m.total_cost_usd)} />
-        <Stat big label="Tokens" value={`${formatTokens(m.prompt_tokens)} in · ${formatTokens(m.completion_tokens)} out`} />
+        <Stat
+          big
+          label="Tokens"
+          value={formatTokens(m.prompt_tokens + m.completion_tokens)}
+          sub={`${formatTokens(m.prompt_tokens)} in · ${formatTokens(m.completion_tokens)} out`}
+        />
         <Stat big label="Calls" value={String(m.n_calls)} />
         <Stat big label="Wall time" value={formatDuration(m.wall_time_s)} />
       </div>
@@ -198,7 +204,7 @@ export function TraceDrawer({ run, open, onClose }: { run: Run; open: boolean; o
                       <td className="px-3 py-2">
                         {c.thinking ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[12px] font-semibold text-accent-strong">
-                            <IconBrain size={13} /> on
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden /> on
                           </span>
                         ) : (
                           <span className="text-[12.5px] text-fog-500">off</span>

@@ -8,7 +8,7 @@ export function tokenize(s: string): string[] {
 }
 
 function norm(tok: string): string {
-  return /^\s+$/.test(tok) ? " " : tok.toLowerCase().replace(/[.,;:!?]+$/, "");
+  return /^\s+$/.test(tok) ? " " : tok.toLowerCase();
 }
 
 /**

@@ -84,6 +84,9 @@ export type Convergence = {
   agreement_after: number;
   clusters_after: number;
   status: "running" | "done" | "error";
+  // Optional extras the backend sends (not in the v1 contract; UI degrades gracefully without them):
+  executed?: number; // denominator for agreement_after
+  implementations?: (Implementation & { passes_locked?: boolean })[];
 };
 
 export type Resolution = {
@@ -96,6 +99,7 @@ export type Resolution = {
   reference_code: string;
   locked_cases: { input_id: string; args: Record<string, unknown>; expected_repr: string }[];
   agreement_before: number;
+  agreement_before_counts?: [number, number]; // optional extra: [matched, total]
   convergence?: Convergence;
 };
 

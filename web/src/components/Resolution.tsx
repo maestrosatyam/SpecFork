@@ -3,25 +3,28 @@ import { useMemo, useState } from "react";
 import type { Api } from "../api";
 import { wordDiff } from "../lib/diff";
 import { formatPct } from "../lib/format";
-import type { Run } from "../types";
+import type { Convergence, Run } from "../types";
 import { CodeBlock, CopyButton } from "./CodeBlock";
 import { CountUpPct } from "./CountUp";
-import { IconArrowRight, IconCheck, IconDownload, IconRefresh, IconX } from "./Icons";
+import { IconArrowRight, IconCheck, IconCode, IconDownload, IconRefresh, IconX } from "./Icons";
 
 export function SpecDiff({ before, after }: { before: string; after: string }) {
   const segs = useMemo(() => wordDiff(before, after), [before, after]);
   return (
-    <p className="text-[18px] leading-[1.75] text-fog-200 sm:text-[19px]">
+    <p className="whitespace-pre-line text-[18px] leading-[1.75] text-fog-200 sm:text-[19px]">
       {segs.map((s, i) =>
         s.type === "same" ? (
           <span key={i}>{s.text}</span>
         ) : s.type === "add" ? (
+          <span key={i}>
+            {s.text.match(/^\s*/)![0]}
           <ins
-            key={i}
             className="rounded-[4px] bg-add/[0.13] px-0.5 text-fog-50 underline decoration-add/70 decoration-2 underline-offset-[5px] [box-decoration-break:clone]"
           >
-            {s.text}
+            {s.text.trim()}
           </ins>
+            {/\S\s+$/.test(s.text) ? s.text.match(/\s+$/)![0] : ""}
+          </span>
         ) : (
           <del key={i} className="text-fog-500 decoration-danger/60">
             {s.text}
@@ -88,31 +91,53 @@ function CodeTabs({ api, run }: { api: Api; run: Run }) {
   );
 }
 
-function ConvergenceTiles({ n, passed, done }: { n: number; passed: number; done: boolean }) {
+type TileState = "pending" | "generated" | "pass" | "fail" | "rejected";
+
+/** Per-tile state: prefer the backend's per-impl list, else derive from passed/n. */
+export function convergenceTileStates(conv: Convergence): TileState[] {
+  const done = conv.status === "done";
+  if (conv.implementations?.length) {
+    return conv.implementations.map((i) => {
+      if (i.status === "rejected" || i.status === "error") return done ? "fail" : "rejected";
+      if (i.status === "executed") {
+        if (i.passes_locked === true) return "pass";
+        if (i.passes_locked === false) return "fail";
+        return "generated";
+      }
+      if (i.status === "generated") return "generated";
+      return done ? "fail" : "pending";
+    });
+  }
+  return Array.from({ length: conv.n }, (_, i) => (i < conv.passed ? "pass" : done ? "fail" : "pending"));
+}
+
+function ConvergenceTiles({ conv }: { conv: Convergence }) {
+  const states = convergenceTileStates(conv);
   return (
     <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-12" aria-hidden>
-      {Array.from({ length: n }, (_, i) => {
-        const ok = i < passed;
-        const failed = done && !ok;
-        return (
-          <motion.div
-            key={i}
-            className={`flex aspect-square items-center justify-center rounded-md border ${
-              ok
-                ? "border-add/40 bg-add text-ink-950"
-                : failed
-                  ? "border-danger/40 bg-danger/20 text-danger"
-                  : "shimmer border-dashed border-white/15 bg-white/[0.02]"
-            }`}
-            initial={false}
-            animate={{ scale: ok || failed ? [0.85, 1] : 1 }}
-            transition={{ duration: 0.25 }}
-          >
-            {ok && <IconCheck size={13} strokeWidth={3} />}
-            {failed && <IconX size={13} strokeWidth={2.6} />}
-          </motion.div>
-        );
-      })}
+      {states.map((st, i) => (
+        <motion.div
+          key={i}
+          className={`flex aspect-square items-center justify-center rounded-md border ${
+            st === "pass"
+              ? "border-add/40 bg-add text-ink-950"
+              : st === "fail"
+                ? "border-danger/40 bg-danger/20 text-danger"
+                : st === "generated"
+                  ? "border-white/25 bg-white/[0.07] text-fog-300"
+                  : st === "rejected"
+                    ? "border-white/10 bg-[#2a3047] text-fog-400"
+                    : "shimmer border-dashed border-white/15 bg-white/[0.02]"
+          }`}
+          initial={false}
+          animate={{ scale: st === "pass" || st === "fail" ? [0.85, 1] : 1 }}
+          transition={{ duration: 0.25 }}
+        >
+          {st === "pass" && <IconCheck size={13} strokeWidth={3} />}
+          {st === "fail" && <IconX size={13} strokeWidth={2.6} />}
+          {st === "generated" && <IconCode size={12} />}
+        </motion.div>
+      ))}
     </div>
   );
 }
@@ -141,16 +166,19 @@ export function AgreementPanel({
   busy,
   error,
   onConverge,
+  convergeLabel,
 }: {
   run: Run;
   busy: boolean;
   error: string | null;
   onConverge: () => void;
+  convergeLabel?: string;
 }) {
   const r = run.resolution!;
   const conv = r.convergence;
-  const nOrig = run.implementations.length;
-  const matched = Math.round(r.agreement_before * nOrig);
+  const nOrig = r.agreement_before_counts?.[1] ?? run.implementations.length;
+  const matched = r.agreement_before_counts?.[0] ?? Math.round(r.agreement_before * nOrig);
+  const convDenom = conv ? (conv.executed ?? conv.n) : 0;
   const converging = run.status === "converging" || conv?.status === "running";
   const done = conv?.status === "done";
   const nClustersBefore = run.clusters.length;
@@ -184,20 +212,20 @@ export function AgreementPanel({
           </motion.div>
         ) : (
           <motion.div key="after" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <span className="font-display text-[64px] font-bold leading-none tracking-[-0.04em] text-fog-400 tabular-nums sm:text-[80px]">
+            <div className="mt-3 flex items-center gap-x-4 gap-y-3 sm:gap-x-6">
+              <span className="font-display text-[48px] font-bold leading-none tracking-[-0.04em] text-fog-400 tabular-nums sm:text-[80px]">
                 {formatPct(r.agreement_before)}
               </span>
-              <IconArrowRight size={44} className="text-fog-500" />
+              <IconArrowRight size={44} className="h-8 w-8 text-fog-500 sm:h-11 sm:w-11" />
               <CountUpPct
                 value={conv!.agreement_after}
                 duration={1.4}
-                className="font-display text-[80px] font-bold leading-none tracking-[-0.04em] text-add tabular-nums sm:text-[104px]"
+                className="font-display text-[60px] font-bold leading-none tracking-[-0.04em] text-add tabular-nums sm:text-[104px]"
               />
             </div>
             <p className="mt-3 max-w-[760px] text-[16px] leading-relaxed text-fog-300">
               <span className="font-semibold text-fog-50">
-                {conv!.passed} of {conv!.n}
+                {conv!.passed} of {convDenom}
               </span>{" "}
               fresh implementations of the clarified spec pass every locked case. Distinct behaviours went from{" "}
               <span className="font-semibold text-fog-50">{nClustersBefore}</span> to{" "}
@@ -216,10 +244,12 @@ export function AgreementPanel({
           <div className="mb-2 flex items-center justify-between text-[13.5px] text-fog-400">
             <span>{converging ? "Re-forking the clarified spec…" : "Re-forked implementations"}</span>
             <span className="tabular-nums">
-              {conv.passed} passing{converging ? " so far" : ` · ${conv.n - conv.passed} differ`}
+              {converging
+                ? `${convergenceTileStates(conv).filter((x) => x !== "pending").length} of ${conv.n} written`
+                : `${conv.passed} passing · ${convDenom - conv.passed} differ${conv.n > convDenom ? ` · ${conv.n - convDenom} didn't run` : ""}`}
             </span>
           </div>
-          <ConvergenceTiles n={conv.n} passed={conv.passed} done={!!done} />
+          <ConvergenceTiles conv={conv} />
         </div>
       )}
       {conv?.status === "error" && (
@@ -240,7 +270,7 @@ export function AgreementPanel({
           ) : (
             <IconRefresh size={18} />
           )}
-          {converging ? "Re-forking…" : done ? "Re-fork again" : "Re-fork clarified spec"}
+          {converging ? "Re-forking…" : convergeLabel ?? (done ? "Re-fork again" : "Re-fork clarified spec")}
         </button>
         {!done && !converging && (
           <span className="text-[14px] text-fog-500">{run.settings.n_samples} fresh implementations · same models · same probes</span>
@@ -261,12 +291,14 @@ export function ResolutionView({
   busy,
   error,
   onConverge,
+  convergeLabel,
 }: {
   api: Api;
   run: Run;
   busy: boolean;
   error: string | null;
   onConverge: () => void;
+  convergeLabel?: string;
 }) {
   const r = run.resolution!;
   return (
@@ -297,7 +329,7 @@ export function ResolutionView({
             ))}
           </ul>
         </section>
-        <AgreementPanel run={run} busy={busy} error={error} onConverge={onConverge} />
+        <AgreementPanel run={run} busy={busy} error={error} onConverge={onConverge} convergeLabel={convergeLabel} />
       </div>
       <CodeTabs api={api} run={run} />
     </div>

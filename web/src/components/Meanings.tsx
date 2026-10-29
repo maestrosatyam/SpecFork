@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { useState } from "react";
 import type { ClusterStyle } from "../lib/clusters";
 import { ambiguityQuestions, likelyBugQuestions, optionImplCount } from "../lib/clusters";
 import { formatCall, formatPct, isErrorRepr } from "../lib/format";
@@ -35,7 +36,7 @@ export function ClusterBar({
               key={c.id}
               className={`relative flex min-w-[28px] items-center justify-start overflow-hidden px-3 transition-[opacity,filter] duration-300 ${
                 s?.crash ? "stripes text-white" : "text-ink-950"
-              } ${isDim(c.id) ? "opacity-20 saturate-[0.3]" : ""} ${i === 0 ? "rounded-l-xl" : ""} ${
+              } ${isDim(c.id) ? "opacity-30 saturate-[0.4]" : ""} ${i === 0 ? "rounded-l-xl" : ""} ${
                 i === clusters.length - 1 ? "rounded-r-xl" : ""
               }`}
               style={{ background: s?.crash ? undefined : s?.color }}
@@ -50,7 +51,7 @@ export function ClusterBar({
               >
                 {c.label}
               </span>
-              {pct > 9 && <span className="ml-2 text-[14px] font-semibold tabular-nums opacity-75">{formatPct(c.share)}</span>}
+              {pct > 9 && <span className="ml-2 hidden text-[14px] sm:inline font-semibold tabular-nums opacity-75">{formatPct(c.share)}</span>}
             </motion.div>
           );
         })}
@@ -60,7 +61,7 @@ export function ClusterBar({
           <li
             key={c.id}
             className={`flex gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 transition-opacity duration-300 ${
-              isDim(c.id) ? "opacity-35" : ""
+              isDim(c.id) ? "opacity-45" : ""
             }`}
             onMouseEnter={() => onHover(c.id)}
             onMouseLeave={() => onHover(null)}
@@ -88,7 +89,7 @@ function Witness({ run, inputId, value }: { run: Run; inputId: string; value: st
   const err = isErrorRepr(value);
   return (
     <div className="mono flex flex-wrap items-baseline gap-x-2 text-[13.5px] leading-relaxed">
-      <span className="text-fog-300">{inp ? formatCall(run.signature?.name, inp.args) : inputId}</span>
+      <span className="text-fog-300">{inp ? formatCall(run.signature?.name, inp.args, run.signature?.params) : inputId}</span>
       <span className="text-fog-500" aria-hidden>
         →
       </span>
@@ -202,8 +203,11 @@ export function QuestionCard({
   onAnswer: (optId: string) => void;
   onHover: (id: string | null) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const total = run.implementations.length;
   const cols = q.options.length >= 3 ? "lg:grid-cols-3" : "md:grid-cols-2";
+  const chosen = q.options.find((o) => o.id === answer);
+  const compact = readOnly && !!chosen && !expanded;
   return (
     <motion.section
       className="card p-5 sm:p-6"
@@ -230,6 +234,20 @@ export function QuestionCard({
           </p>
         </div>
       </div>
+      {compact ? (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-fog-100/30 bg-white/[0.04] px-4 py-3 sm:ml-[52px]">
+          <span className="flex items-center gap-2.5 text-[16px] font-semibold text-fog-50">
+            <IconCheck size={16} strokeWidth={2.6} className="text-add" />
+            {chosen!.label}
+          </span>
+          <span className="flex items-center gap-3 text-[13.5px] text-fog-400">
+            chosen by {optionImplCount(run.clusters, chosen!.cluster_ids)} of {total}
+            <button type="button" className="btn btn-quiet py-1 text-[13px]" onClick={() => setExpanded(true)} aria-expanded={false}>
+              Show all {q.options.length} options
+            </button>
+          </span>
+        </div>
+      ) : (
       <div role="radiogroup" aria-labelledby={`q-${q.id}-text`} className={`mt-5 grid gap-3 ${cols}`}>
         {q.options.map((opt) => (
           <OptionCard
@@ -246,6 +264,7 @@ export function QuestionCard({
           />
         ))}
       </div>
+      )}
     </motion.section>
   );
 }
@@ -320,6 +339,7 @@ export function LockBar({
   locked,
   error,
   onLock,
+  recordedOnForkLive,
 }: {
   answered: number;
   total: number;
@@ -327,13 +347,30 @@ export function LockBar({
   locked: boolean;
   error: string | null;
   onLock: () => void;
+  /** Set for recorded sample runs (server rejects answers): offer a live fork instead. */
+  recordedOnForkLive?: () => void;
 }) {
-  const ready = answered === total && total > 0;
+  if (recordedOnForkLive && !locked) {
+    return (
+      <div className="sticky bottom-4 z-20">
+        <div className="card flex items-center justify-between gap-3 border-accent/25 bg-ink-800/95 px-4 py-3 sm:px-5 sm:py-4">
+          <span className="text-[15px] text-fog-300">
+            <span className="font-semibold text-fog-50">Recorded run.</span> Explore the options here, then fork it live
+            to lock in your own answers.
+          </span>
+          <button type="button" className="btn btn-primary shrink-0 px-4 py-2.5 text-[15px] sm:px-6 sm:py-3 sm:text-[16px]" onClick={recordedOnForkLive}>
+            Fork it live
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const ready = answered === total;
   return (
     <div className="sticky bottom-4 z-20">
-      <div className="card flex flex-col gap-3 border-white/12 bg-ink-800/95 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="card flex items-center justify-between gap-3 border-white/12 bg-ink-800/95 px-4 py-3 sm:px-5 sm:py-4">
         <div className="flex items-center gap-3">
-          <div className="flex gap-1" aria-hidden>
+          <div className="hidden gap-1 sm:flex" aria-hidden>
             {Array.from({ length: total }, (_, i) => (
               <span key={i} className={`h-2 w-7 rounded-full transition-colors ${i < answered ? "bg-fog-100" : "bg-white/12"}`} />
             ))}
@@ -346,7 +383,7 @@ export function LockBar({
                 <span className="font-semibold tabular-nums text-fog-50">
                   {answered} of {total}
                 </span>{" "}
-                answered{ready ? ": ready to lock in" : ""}
+                answered{ready ? (total ? ": ready to lock in" : ". Nothing to decide") : ""}
               </>
             )}
           </span>
@@ -359,7 +396,7 @@ export function LockBar({
           </AnimatePresence>
         </div>
         {!locked && (
-          <button type="button" className="btn btn-primary px-6 py-3 text-[16px]" disabled={!ready || busy} onClick={onLock}>
+          <button type="button" className="btn btn-primary shrink-0 px-4 py-2.5 text-[15px] sm:px-6 sm:py-3 sm:text-[16px]" disabled={!ready || busy} onClick={onLock}>
             {busy ? (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-900/30 border-t-ink-900" aria-hidden />
             ) : (

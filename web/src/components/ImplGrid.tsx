@@ -76,14 +76,14 @@ export function ImplTile({
       disabled={impl.status === "pending"}
       aria-label={tileLabel(impl, style)}
       title={tileLabel(impl, style)}
-      className={`${base} ${cls} ${dimmed ? "opacity-[0.18] saturate-[0.3]" : "opacity-100"} disabled:cursor-default`}
+      className={`${base} ${cls} ${dimmed ? "opacity-[0.22] saturate-[0.35]" : "opacity-100"} disabled:cursor-default`}
       style={bg}
       initial={false}
       animate={{ scale: 1 }}
       whileTap={{ scale: 0.96 }}
     >
       <span
-        className={`absolute left-1.5 top-1 font-mono text-[10.5px] tabular-nums ${
+        className={`absolute left-1.5 top-1 hidden font-mono text-[10.5px] sm:block tabular-nums ${
           clustered && !style!.crash ? "text-ink-950/70" : "text-fog-500"
         }`}
       >

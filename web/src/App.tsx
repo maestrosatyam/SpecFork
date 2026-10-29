@@ -5,10 +5,11 @@ import { Header } from "./components/Header";
 import { HowItWorksModal } from "./components/HowItWorks";
 import { RunView } from "./components/RunView";
 import { runHash, useHashRoute } from "./lib/route";
-import type { Preset, RunSummary } from "./types";
+import type { Health, Preset, RunSummary } from "./types";
 
 export function App() {
   const [api, setApi] = useState<Api | null>(null);
+  const [health, setHealth] = useState<Health | null>(null);
   const [route, go] = useHashRoute();
   const [presets, setPresets] = useState<Preset[] | null>(null);
   const [presetsError, setPresetsError] = useState<string | null>(null);
@@ -17,7 +18,10 @@ export function App() {
   const [draft, setDraft] = useState<{ spec: string; key: number }>({ spec: "", key: 0 });
 
   useEffect(() => {
-    detectApi().then(({ api }) => setApi(api));
+    detectApi().then(({ api, health }) => {
+      setApi(api);
+      setHealth(health);
+    });
   }, []);
 
   useEffect(() => {
@@ -70,6 +74,7 @@ export function App() {
             presetsError={presetsError}
             recent={recent}
             initialSpec={draft.spec}
+            liveDisabled={api.mode === "live" && health?.llm_configured === false}
             onCreated={(id) => go(runHash(id))}
             onOpenRun={(id) => go(runHash(id))}
           />

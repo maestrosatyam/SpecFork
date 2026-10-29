@@ -97,7 +97,7 @@ export function ImplDrawer({
                       return (
                         <tr key={inp.id} className="border-t border-white/[0.05] align-top">
                           <td className="mono px-4 py-2.5 text-fog-200">
-                            {formatCall(fn, inp.args)}
+                            {formatCall(fn, inp.args, run.signature?.params)}
                             <span className="ml-2 inline-flex gap-1 align-middle">
                               {witnessIds.has(inp.id) && (
                                 <span className="rounded bg-accent/15 px-1.5 py-px font-sans text-[11px] font-semibold text-accent-strong">

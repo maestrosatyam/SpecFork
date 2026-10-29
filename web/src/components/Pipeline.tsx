@@ -100,7 +100,7 @@ export function LiveLog({ run }: { run: Run }) {
   return (
     <div
       ref={ref}
-      className="mono scroll-thin max-h-[230px] overflow-y-auto rounded-xl border border-white/[0.06] bg-ink-950/70 px-3.5 py-3 text-[12.5px] leading-[1.7]"
+      className="mono scroll-thin max-h-[170px] overflow-y-auto lg:max-h-[230px] rounded-xl border border-white/[0.06] bg-ink-950/70 px-3.5 py-3 text-[12.5px] leading-[1.7]"
       role="log"
       aria-live="polite"
       aria-label="Live pipeline log"
@@ -115,7 +115,7 @@ export function LiveLog({ run }: { run: Run }) {
             className="flex gap-2.5"
           >
             <span className="shrink-0 tabular-nums text-fog-500">{relTime(run, l.t)}</span>
-            <span className="shrink-0 text-accent/80">{l.stage.padEnd(8, " ")}</span>
+            <span className="w-[62px] shrink-0 text-accent/80">{i > 0 && lines[i - 1].stage === l.stage ? "" : l.stage}</span>
             <span className="min-w-0 break-words text-fog-200">{l.msg}</span>
           </motion.div>
         ))}
