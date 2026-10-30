@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Open questions** (opt-in, `SPECFORK_OPEN_QUESTIONS=1`): after the witness-backed questions, up to three
+  free-text questions about what the executed evidence did not cover. Free-text answers are implemented and
+  executed, then become the reference. Web UI section "Anything else? (optional)".
+- **Exception types as behaviours** (`--exception-types`), **adaptive N** (`SPECFORK_ADAPTIVE_N`), a **second
+  probing round** (`SPECFORK_PROBE_ROUNDS=2`), a **YAML decision record** (`--decision-file .specfork.yaml`,
+  `/export.yaml`), **mixed-model fan-out** (`SPECFORK_IMPLEMENTERS`) and an optional Qwen3 implementer profile.
+- Evaluation: `--repeats`, bootstrap confidence intervals, and a scheduled benchmark workflow.
+
+### Changed
+
+- The evaluation report now pools five runs with default settings, including a re-run of the original code.
+  SpecFork scores 33.1% against 45.7% for an ask-first baseline. The earlier single-run "tie" did not
+  reproduce. See `docs/EVALUATION.md`.
+- Free-text answers get up to four implementation attempts across both models.
+
 ## [0.2.0] - 2026-10-30
 
 SpecFork becomes an installable tool: the same engine now runs from the terminal, from coding agents (MCP),

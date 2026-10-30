@@ -47,14 +47,15 @@ Silent assumption 2: Should the amounts add up exactly to the total, or may the 
 The output above is abridged from the recorded sample run
 [`specfork/samples/split_bill.json`](specfork/samples/split_bill.json). In that run, 4 of 24 original
 implementations matched the chosen behaviour on the locked cases (17%); after clarification, 17 of 22
-fresh implementations did (77%).
+fresh implementations did (77%). In this run the framing step added a `tip_percent` parameter the spec never
+mentioned; the framing prompt now forbids invented parameters.
 
 You get back:
 
 - a **clarified spec** that states only the points you decided;
 - a **pytest file** whose expected values come from executed outputs, never from model-written assertions;
 - a **reference implementation** (the chosen behaviour, or a new executed implementation of your free-text answer);
-- a **decision record** (JSON) you can commit next to the code.
+- a **decision record** (JSON or `.specfork.yaml`) you can commit next to the code.
 
 ## Quickstart
 
