@@ -65,7 +65,7 @@ SpecFork ties a well-prompted ask-first baseline on alignment and doubles no-cla
 ## Quick start
 
 ```bash
-git clone <this repo> && cd <repo>
+git clone https://github.com/maestrosatyam/SpecFork.git && cd SpecFork
 cp .env.example .env            # add NEBIUS_API_KEY
 make setup                      # Python 3.12 venv (uv) + frontend deps
 make test                       # offline tests (no API key needed)
