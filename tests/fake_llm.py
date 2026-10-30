@@ -53,7 +53,9 @@ def make_transport(counter: dict | None = None) -> httpx.MockTransport:
         body = json.loads(request.content)
         system = body["messages"][0]["content"]
         counter[body.get("model")] = counter.get(body.get("model"), 0) + 1
-        if "design extra test inputs" in system:
+        if "ADDITIONAL" in system and "clarifying" in system:
+            content, reasoning = json.dumps({"questions": ["What should happen when the bill total is negative?"]}), "think"
+        elif "design extra test inputs" in system:
             content = json.dumps({"inputs": [{"args": {"total": 100, "n": 7}, "note": "remainder 2"},
                                              {"args": {"total": 100, "n": 3}, "note": "already tried"}]})
             reasoning = None

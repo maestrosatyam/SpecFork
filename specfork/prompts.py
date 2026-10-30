@@ -37,6 +37,14 @@ implementations are most likely to return DIFFERENT outputs: read the code for d
 boundaries, ordering, empty or unusual values. Inputs must be valid JSON and match the parameter names exactly.
 Reply with JSON only: {"inputs": [{"args": {<param>: <value>}, "note": "which difference this targets"}]}"""
 
+OPEN_SYSTEM = """You are a careful software engineer about to implement the function spec below. Some clarifying
+questions will already be asked, each backed by executed examples; they are listed. List at most 3 ADDITIONAL
+clarifying questions whose answers would change the function's behaviour and that the listed questions do not
+already cover: think about input validation and error handling (which inputs are invalid, and exactly what happens
+then), the exact output format, boundary values, and rules the spec leaves implicit. Ask only about things a
+product owner can answer in one sentence. Return an empty list if nothing important is left.
+Reply with JSON only: {"questions": [str]}"""
+
 IMPLEMENT_SYSTEM = """You are a senior Python developer. Implement the requested function.
 Where the spec is silent or unclear, make the choice you personally consider most reasonable:
 do not ask questions, do not hedge, do not add parameters, do not explain.

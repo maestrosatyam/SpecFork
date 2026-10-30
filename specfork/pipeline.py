@@ -56,7 +56,8 @@ DEFAULT_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
 def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None,
             fast_model: str = DEFAULT_FAST, deep_model: str = DEFAULT_DEEP, *,
             implementers: list[str] | None = None, assumptions: bool = True,
-            exception_types: bool = False, adaptive_n: bool = False, probe_rounds: int = 1) -> dict[str, Any]:
+            exception_types: bool = False, adaptive_n: bool = False, probe_rounds: int = 1,
+            open_questions: bool = False) -> dict[str, Any]:
     """A fresh run record. Model arguments are model ids (or registry keys) resolved by the ModelRouter."""
     t = now()
     return {
@@ -65,6 +66,7 @@ def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None
         "settings": {"n_samples": n_samples, "fast_model": fast_model, "deep_model": deep_model,
                      "implementers": list(implementers or [fast_model]), "assumptions": assumptions,
                      "exception_types": exception_types, "adaptive_n": adaptive_n, "probe_rounds": probe_rounds,
+                     "open_questions": open_questions,
                      "prompt_version": prompts.PROMPT_VERSION, "prompt_hash": prompts.prompt_hash()},
         "inputs": [], "implementations": [], "clusters": [], "questions": [], "trace": [],
         "metrics": {"total_cost_usd": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "n_calls": 0, "wall_time_s": 0.0},
@@ -610,6 +612,26 @@ class SpecFork:
             added += 1
         self._log(run, "explain", f"{added} silent assumption(s) found")
 
+    async def open_questions(self, run: dict[str, Any]) -> None:
+        """Ask-first questions the executed evidence did not cover; answered in the owner's own words."""
+        if not run["settings"].get("open_questions"):
+            return
+        asked = [q["text"] for q in run["questions"]]
+        user = (prompts.frame_user(run["spec"], run.get("signature"))
+                + "\n\nQuestions already being asked:\n" + json.dumps(asked, indent=1))
+        try:
+            raw = await self._json_call(run, "open_questions", prompts.OPEN_SYSTEM, user,
+                                        model=run["settings"]["fast_model"], thinking=True, max_tokens=6000,
+                                        temperature=0.4, fallback_no_thinking=True)
+        except (LLMError, PipelineError) as e:
+            self._log(run, "explain", f"Open questions unavailable ({str(e)[:60]})")
+            return
+        qs = [str(q).strip() for q in ((raw.get("questions") if isinstance(raw, dict) else raw) or []) if str(q).strip()][:3]
+        for k, text in enumerate(qs):
+            run["questions"].append({"id": f"o{k}", "kind": "open", "text": text[:300], "why": "",
+                                     "witness_input_ids": [], "options": []})
+        self._log(run, "explain", f"{len(qs)} open question(s) for your own words")
+
     async def run_all(self, run: dict[str, Any]) -> None:
         t0 = time.perf_counter()
         try:
@@ -620,6 +642,7 @@ class SpecFork:
                 await self.probe_more(run)
                 axes = self.cluster(run)
             await self.explain(run, axes)
+            await self.open_questions(run)
             run["stage"] = "done"
             run["status"] = "awaiting_answers"
         except (PipelineError, LLMError) as e:
@@ -650,7 +673,7 @@ class SpecFork:
             for q in run["questions"]:
                 # drop a custom option from an earlier resolution of this run
                 q["options"] = [o for o in q["options"] if not o.get("is_custom")]
-                if q["id"] in other and q["kind"] in ("ambiguity", "assumption"):
+                if q["id"] in other and q["kind"] in ("ambiguity", "assumption", "open"):
                     custom_qs.append(q)  # its executed implementation reflects the answer: nothing to unlock
                     decisions.append({"question": q["text"], "answer": other[q["id"]],
                                       "note": "Free-text answer from the product owner; no sampled implementation did this."})
@@ -660,7 +683,7 @@ class SpecFork:
                 if opt is None:
                     if q["kind"] in ("ambiguity", "assumption"):
                         raise PipelineError(f"question {q['id']} not answered")
-                    continue
+                    continue  # open questions are optional
                 q["answer_option_id"] = opt["id"]
                 if opt.get("is_alternative"):
                     overrides.update(q.get("affected_input_ids") or [])

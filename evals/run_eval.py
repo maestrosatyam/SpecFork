@@ -32,6 +32,7 @@ sys.path.insert(0, str(ROOT))
 MODEL_FAST = "nvidia/Nemotron-3_5-Lightning"  # replaced from Settings in main()
 MODEL_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
 ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS = 0.0, 3, False  # replaced from Settings in main()
+OPEN_QS = False
 IMPLEMENTERS: list[str] = []  # model ids for the SpecFork fan-out (mixed-model condition); default: fast model
 
 
@@ -135,7 +136,7 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
 
         # ---------------- SpecFork
         rs = new_run(f"sf-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP,
-                     implementers=IMPLEMENTERS or [MODEL_FAST])
+                     implementers=IMPLEMENTERS or [MODEL_FAST], open_questions=OPEN_QS)
         rs["signature"] = sig
         try:
             await eng.run_all(rs)
@@ -165,6 +166,17 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
                     other[q["id"]] = pick["other"].strip()
                 else:
                     answers[q["id"]] = oid if any(o["id"] == oid for o in cands) else cands[0]["id"]
+            open_qs = [q for q in rs["questions"] if q["kind"] == "open"]
+            if open_qs:
+                ans = await eng._json_call(rs, "sim_user", SIM_USER_FREE_SYSTEM,
+                                           f"Spec:\n{item['spec']}\n\nYour intent:\n{item['intent']}\n\nQuestions:\n"
+                                           + json.dumps([q["text"] for q in open_qs], indent=1),
+                                           model=MODEL_FAST, thinking=False, max_tokens=1500, temperature=0.0)
+                raw_ans = ans.get("answers") if isinstance(ans, dict) else ans
+                for q, a in zip(open_qs, raw_ans or [], strict=False):
+                    text = (a.get("answer") if isinstance(a, dict) else str(a)) or ""
+                    if 3 <= len(text.strip()) <= 300 and "no preference" not in text.lower():
+                        other[q["id"]] = text.strip()
             await eng.resolve(rs, answers, other)
             res = rs["resolution"]
             rs["hidden_inputs"] = hidden
@@ -185,7 +197,7 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
                 "aligned": ok, "executed": k, "alignment": ok / k if k else 0.0,
                 "questions": sum(1 for q in rs["questions"] if q["kind"] in ("ambiguity", "assumption")),
                 "assumptions": sum(1 for q in rs["questions"] if q["kind"] == "assumption"),
-                "free_text_answers": len(other),
+                "free_text_answers": len(other), "open_questions": sum(1 for q in rs["questions"] if q["kind"] == "open"),
                 "likely_bugs": sum(1 for q in rs["questions"] if q["kind"] == "likely_bug"),
                 "question_texts": [q["text"] for q in rs["questions"] if q["kind"] in ("ambiguity", "assumption")],
                 "behaviours": len([c for c in rs["clusters"] if c["kind"] == "behavior"]),
@@ -270,12 +282,13 @@ async def main() -> int:
     if args.items:
         wanted = set(args.items.split(","))
         items = [i for i in items if i["id"] in wanted]
-    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS, IMPLEMENTERS
+    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS, IMPLEMENTERS, OPEN_QS
     settings = Settings.load(ROOT / ".env")
     ASSUME_CONF, ASSUME_MAX = settings.assumption_min_confidence, settings.max_assumptions
     ASSUME_WITNESS = settings.assumption_requires_witness
     registry = Registry.load(settings.models_file)
     IMPLEMENTERS = [registry.get(k).model for k in settings.implementer_keys]
+    OPEN_QS = settings.open_questions
     MODEL_FAST, MODEL_DEEP = registry.get(settings.fast_model).model, registry.get(settings.deep_model).model
     client = ModelRouter(registry, settings.api_keys, max_concurrency=12, default_model=settings.fast_model)
     sem = asyncio.Semaphore(args.concurrency)
@@ -285,7 +298,7 @@ async def main() -> int:
     stamp = time.strftime("%Y%m%d-%H%M%S")
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
-    meta = {"timestamp": stamp, "n": args.n, "repeats": args.repeats, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "implementers": IMPLEMENTERS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
+    meta = {"timestamp": stamp, "n": args.n, "repeats": args.repeats, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "implementers": IMPLEMENTERS, "open_questions": OPEN_QS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
             "prompt_version": prompts.PROMPT_VERSION, "wall_s": round(time.time() - t0, 1), "items": len(items)}
     (outdir / f"eval-{stamp}.json").write_text(json.dumps({"meta": meta, "results": results}, indent=1))
     summary = summarize(results, args.n)

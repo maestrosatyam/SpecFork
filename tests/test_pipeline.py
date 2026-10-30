@@ -272,3 +272,17 @@ async def test_second_probing_round_adds_new_inputs_and_reruns():
     executed = [i for i in run["implementations"] if i["status"] == "executed"]
     assert all(added[0]["id"] in i["outcomes"] for i in executed)
     await client.aclose()
+
+
+async def test_open_questions_answered_in_free_text():
+    eng, client = _engine()
+    run = new_run("t12", SPEC, 8, open_questions=True)
+    await eng.run_all(run)
+    oq = [q for q in run["questions"] if q["kind"] == "open"]
+    assert [q["text"] for q in oq] == ["What should happen when the bill total is negative?"]
+    answers = {q["id"]: q["options"][0]["id"] for q in run["questions"] if q["kind"] in ("ambiguity", "assumption")}
+    await eng.resolve(run, dict(answers))  # open questions are optional
+    assert run["status"] == "resolved"
+    await eng.resolve(run, dict(answers), {oq[0]["id"]: "the first people pay the leftover cents; negative totals raise"})
+    assert run["resolution"]["custom_impl_id"]  # the free-text answer is implemented and executed
+    await client.aclose()
