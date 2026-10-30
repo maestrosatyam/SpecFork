@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.cluster import compatible_option_ids  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-ANSWER_HINTS = {"split_bill": ["first", "add up", "sum"], "business_days": ["exclud", "not count"],
+ANSWER_HINTS = {"split_bill": ["first", "add up", "sum", "raise", "error"], "business_days": ["swap", "inclusive", "exclud"],
                 "dedupe_emails": ["first", "original"], "round_grade": ["90"], "truncate": ["includ", "total"],
                 "percent_change": ["none", "error", "undefined"]}
 
@@ -63,7 +63,10 @@ def main() -> int:
             ok = set(compatible_option_ids(run["questions"], answers, q["id"], run["clusters"]))
             cands = [o for o in q["options"] if o["id"] in ok] or q["options"]
             hints = ANSWER_HINTS.get(p["id"], [])
-            pick = next((o for h in hints for o in cands if h in o["label"].lower()), cands[0])
+            if q["kind"] == "assumption":  # recorded samples keep what the implementations assumed
+                pick = next((o for o in cands if not o.get("is_alternative")), cands[0])
+            else:
+                pick = next((o for h in hints for o in cands if h in o["label"].lower()), cands[0])
             answers[q["id"]] = pick["id"]
             print(f"  Q: {q['text']}\n     -> {pick['label']}")
         c.post(f"/api/runs/{rid}/answers", json={"answers": answers})

@@ -24,6 +24,7 @@ from .sandbox import check_code, exec_semaphore, run_function
 
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,40}$")
 MAX_INPUTS = 24
+CONSENSUS_SHARE = 0.75
 FRAME_THINKING = os.environ.get("FRAME_THINKING", "0") == "1"
 
 
@@ -536,10 +537,24 @@ class SpecFork:
             best = max(surv, key=lambda c: clusters[c]["size"])
             chosen_impl = next(i for i in run["implementations"] if i["id"] == clusters[best]["representative_impl_id"])
             inputs = {i["id"]: i for i in run["inputs"]}
-            locked = [{"input_id": iid, "args": inputs[iid]["args"], "expected_repr": outcome_key(o)}
-                      for iid, o in chosen_impl["outcomes"].items() if iid not in overrides]
-            expected = {c["input_id"]: c["expected_repr"] for c in locked}
             ex = {i["id"]: i["outcomes"] for i in run["implementations"] if i["status"] == "executed"}
+            # Lock only what was decided (witnesses of answered questions) or what the original
+            # implementations already agreed on (>= 75%). Split cases nobody asked about stay open.
+            decided = {w for q in run["questions"] if q.get("answer_option_id")
+                       and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])
+                       for w in q["witness_input_ids"]}
+            locked, left_open = [], []
+            for iid, o in chosen_impl["outcomes"].items():
+                if iid in overrides:
+                    continue
+                key = outcome_key(o)
+                share = sum(1 for per in ex.values() if outcome_key(per.get(iid)) == key) / max(1, len(ex))
+                if iid in decided or share >= CONSENSUS_SHARE:
+                    locked.append({"input_id": iid, "args": inputs[iid]["args"], "expected_repr": key,
+                                   "basis": "decided" if iid in decided else "consensus"})
+                else:
+                    left_open.append(iid)
+            expected = {c["input_id"]: c["expected_repr"] for c in locked}
             passed, n = agreement(ex, expected)
             run["status"] = "resolving"
             run["resolution"] = {
@@ -549,6 +564,7 @@ class SpecFork:
                 "tests_code": "", "reference_code": chosen_impl["code"], "locked_cases": locked,
                 "agreement_before": round(passed / n, 4) if n else 0.0, "agreement_before_counts": [passed, n],
                 "unlocked_input_ids": sorted(overrides),
+                "open_input_ids": left_open,
             }
             self._log(run, "resolve", f"Chosen behaviour {clusters[best]['label']}: {passed}/{n} original implementations already matched it")
             clarified = run["spec"]
@@ -574,7 +590,7 @@ class SpecFork:
             run["resolution"]["clarified_spec"] = clarified
             run["resolution"]["tests_code"] = render_tests(run["signature"], locked, clarified)
             run["status"] = "resolved"
-            self._log(run, "resolve", f"Locked {len(locked)} executable test cases")
+            self._log(run, "resolve", f"Locked {len(locked)} executable test cases ({len(left_open)} undecided case(s) left open)")
         except PipelineError as e:
             run["status"] = "awaiting_answers"
             run["error"] = str(e)
