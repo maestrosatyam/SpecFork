@@ -47,7 +47,7 @@ Every Nebius call (model ID, latency, tokens, cost, reasoning excerpt) is shown 
 
 Endpoint: `https://api.tokenfactory.nebius.com/v1` (OpenAI-compatible chat completions), see
 [`app/llm.py`](app/llm.py). To confirm the integration yourself: `make probe` writes
-`evidence/nebius_model_runtime_probe.json` with model IDs, latencies, token usage and outputs
+`docs/results/nebius_model_runtime_probe.json` with model IDs, latencies, token usage and outputs
 (no secrets).
 
 ## Results (honest summary)
@@ -60,7 +60,7 @@ A live benchmark on 26 ambiguous and 6 clear hand-written specs (N=12 implementa
 | One ask-first prompt + Ultra rewrite | 39.0% |
 | SpecFork | 41.9% |
 
-SpecFork ties a well-prompted ask-first baseline on alignment and doubles no-clarification. It adds things the baseline cannot produce: executed witnesses for every question, deterministic locked tests and a measured re-fork. The cost is about $0.015 per spec. Details and failure cases are in [`evidence/EVALUATION_RESULTS.md`](evidence/EVALUATION_RESULTS.md).
+SpecFork ties a well-prompted ask-first baseline on alignment and doubles no-clarification. It adds things the baseline cannot produce: executed witnesses for every question, deterministic locked tests and a measured re-fork. The cost is about $0.015 per spec. Details and failure cases are in [`docs/EVALUATION.md`](docs/EVALUATION.md).
 
 ## Quick start
 
@@ -84,11 +84,8 @@ app/            FastAPI backend: llm.py (Nebius client), pipeline.py (orchestrat
 web/            React + TypeScript + Tailwind frontend
 tests/          offline unit/integration tests (scripted fake LLM; no network)
 evals/          benchmark (32 hand-written specs with hidden reference implementations) + live eval runner
-scripts/        probe, deploy (Cloud Run), sample-run recorder, video production pipeline
-evidence/       runtime probe, test logs, evaluation results, security checks
-submission/     Devpost text, compliance matrix, architecture, feedback, demo video assets
-research/       idea selection record
-oss/            separate open-source contribution (NVIDIA NeMo Agent Toolkit)
+scripts/        Nebius probe, Cloud Run deploy, sample-run recorder, hosted smoke test
+docs/           API contract, evaluation results, security checks
 ```
 
 ## Security
@@ -96,7 +93,7 @@ oss/            separate open-source contribution (NVIDIA NeMo Agent Toolkit)
 Generated code is treated as hostile: AST allow-list, proxied stdlib modules, restricted builtins,
 `python -I -S` subprocess with a stripped environment, rlimits (CPU, memory, file size, fds), per-call
 timeouts, a fresh network namespace (no network), a non-dumpable server process, and a non-root container.
-Details and executed tests: [`evidence/SECURITY_CHECKS.md`](evidence/SECURITY_CHECKS.md).
+Details and executed tests: [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## Prior art and honesty
 
@@ -105,7 +102,7 @@ The core signal (sample many programs, execute, cluster, ask) is known from rese
 contribution is the interactive product loop: witness-backed questions, deterministic locked tests, and a
 measured re-fork. SpecFork cannot surface an ambiguity that every sampled implementation resolves the same
 way. Evaluation results, including where baselines do as well, are in
-[`evidence/EVALUATION_RESULTS.md`](evidence/EVALUATION_RESULTS.md).
+[`docs/EVALUATION.md`](docs/EVALUATION.md).
 
 ## License
 

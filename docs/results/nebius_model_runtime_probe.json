@@ -1,0 +1,169 @@
+{
+  "probe": "nebius_token_factory_nvidia_nemotron",
+  "timestamp_utc": "2026-10-30T08:23:30.019308+00:00",
+  "provider": "Nebius Token Factory (OpenAI-compatible chat completions)",
+  "base_url": "https://api.tokenfactory.nebius.com/v1",
+  "auth": "Bearer <redacted>",
+  "results": [
+    {
+      "case": "list_models",
+      "http_status": 200,
+      "latency_s": 0.568,
+      "nvidia_models": [
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3-Ultra-550b-a55b",
+        "nvidia/Nemotron-3.5-Super-VL",
+        "nvidia/Nemotron-3_5-Lightning",
+        "nvidia/nemotron-3-super-120b-a12b"
+      ]
+    },
+    {
+      "case": "fast_thinking_off",
+      "model": "nvidia/Nemotron-3_5-Lightning",
+      "http_status": 200,
+      "latency_s": 0.351,
+      "response_id": "chatcmpl-459bc509",
+      "response_model": "nvidia/Nemotron-3_5-Lightning",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 4,
+        "prompt_tokens": 34,
+        "total_tokens": 38,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": null,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 34
+      },
+      "content": "391",
+      "has_reasoning_content": false,
+      "reasoning_excerpt": "",
+      "tool_calls": null
+    },
+    {
+      "case": "deep_thinking_off",
+      "model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "http_status": 200,
+      "latency_s": 0.583,
+      "response_id": "chatcmpl-967943204865a4a7",
+      "response_model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 4,
+        "prompt_tokens": 34,
+        "total_tokens": 38,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0,
+          "multimodal_tokens": null
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 34
+      },
+      "content": "391",
+      "has_reasoning_content": false,
+      "reasoning_excerpt": "",
+      "tool_calls": null
+    },
+    {
+      "case": "fast_thinking_on",
+      "model": "nvidia/Nemotron-3_5-Lightning",
+      "http_status": 200,
+      "latency_s": 2.85,
+      "response_id": "chatcmpl-99df6d06",
+      "response_model": "nvidia/Nemotron-3_5-Lightning",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 482,
+        "prompt_tokens": 34,
+        "total_tokens": 516,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 464,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": null,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 34
+      },
+      "content": "The result of 17 times 23 is 391.",
+      "has_reasoning_content": true,
+      "reasoning_excerpt": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - User asks: \"In one sentence: what is 17 * 23? Give the number.\"\n   - Constraints: \n     - One sentence\n     - Must give the number (the product)\n     - Format: \"In one sentence: what is 17 * 23? Give the number.\"\n\n2.  **Calculate 17 * 23:**\n   - 17 * 23 = 17 * (20 + 3) = 340 + 51 = 391\n   - Check: 17 * 20 = 340, 17 * 3 = 51, 340 + 51 = 3",
+      "tool_calls": null
+    },
+    {
+      "case": "fast_json_schema",
+      "model": "nvidia/Nemotron-3_5-Lightning",
+      "http_status": 200,
+      "latency_s": 0.409,
+      "response_id": "chatcmpl-b1955d51",
+      "response_model": "nvidia/Nemotron-3_5-Lightning",
+      "finish_reason": "stop",
+      "usage": {
+        "completion_tokens": 19,
+        "prompt_tokens": 42,
+        "total_tokens": 61,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": null,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 42
+      },
+      "content": "{\"answer\": 391, \"confidence\": 1.0}",
+      "has_reasoning_content": false,
+      "reasoning_excerpt": "",
+      "tool_calls": null
+    },
+    {
+      "case": "fast_tool_call",
+      "model": "nvidia/Nemotron-3_5-Lightning",
+      "http_status": 200,
+      "latency_s": 0.5,
+      "response_id": "chatcmpl-4f394ffd",
+      "response_model": "nvidia/Nemotron-3_5-Lightning",
+      "finish_reason": "tool_calls",
+      "usage": {
+        "completion_tokens": 35,
+        "prompt_tokens": 431,
+        "total_tokens": 466,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": null,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 431
+      },
+      "content": "",
+      "has_reasoning_content": false,
+      "reasoning_excerpt": "",
+      "tool_calls": [
+        {
+          "id": "call_04c5ada631af427db279378e",
+          "function": {
+            "arguments": "{\"a\":17,\"b\":23}",
+            "name": "multiply"
+          },
+          "type": "function"
+        }
+      ]
+    }
+  ]
+}

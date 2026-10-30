@@ -2,7 +2,7 @@
 """Unauthenticated smoke test of the public SpecFork deployment (what a judge does).
 
 Usage: .venv/bin/python scripts/smoke_hosted.py https://<host> [--live]
-Writes evidence/HOSTED_SMOKE_TEST.md. --live also performs one real fork (uses Nebius inference).
+Prints a markdown report. --live also performs one real fork (uses Nebius inference).
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def main() -> int:
     md = [f"# Hosted smoke test\n", f"Target: {base}  \nRun at: {stamp}  \nClient: unauthenticated `httpx` from a fresh process (no cookies).\n",
           "| Check | Result | Detail |", "|---|---|---|"]
     md += [f"| {n} | {'PASS' if ok else 'FAIL'} | {d.replace('|', '/')} |" for n, ok, d in rows]
-    (ROOT / "evidence" / "HOSTED_SMOKE_TEST.md").write_text("\n".join(md) + "\n")
+    print("\n".join(md))
     return 0 if all(ok for _, ok, _ in rows) else 1
 
 

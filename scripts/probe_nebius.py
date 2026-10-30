@@ -2,7 +2,7 @@
 """Eligibility probe: real NVIDIA Nemotron inference through Nebius Token Factory.
 
 Runs a set of small live requests against the Token Factory OpenAI-compatible API
-and writes a sanitized evidence file (no secrets) to evidence/nebius_model_runtime_probe.json.
+and writes a sanitized evidence file (no secrets) to docs/results/nebius_model_runtime_probe.json.
 
 Usage:  NEBIUS_API_KEY=... python scripts/probe_nebius.py
 """
@@ -132,7 +132,7 @@ def main() -> int:
         "auth": "Bearer <redacted>",
         "results": results,
     }
-    path = ROOT / "evidence" / "nebius_model_runtime_probe.json"
+    path = ROOT / "docs" / "results" / "nebius_model_runtime_probe.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, indent=2))
     for r in results:

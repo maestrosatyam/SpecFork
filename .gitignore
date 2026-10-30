@@ -21,3 +21,15 @@ submission/video/audio/
 submission/video/*.wav
 submission/video/*.mp4
 submission/video/qa/frames/
+
+# Not part of the public project (kept locally only)
+submission/
+research/
+oss/
+evidence/
+scripts/video/
+scripts/publish_github.sh
+STATUS.md
+sample.json
+evals/results/
+web/screenshots/
