@@ -269,19 +269,21 @@ async def cmd_ci(a: argparse.Namespace) -> int:
         for spec_path in specs:
             name = Path(spec_path).stem
             run_file, answers_file = state / f"{name}.run.json", state / f"{name}.answers.json"
+            run: Run | None = None
             if run_file.exists():
                 run = Run.model_validate(json.loads(run_file.read_text()))
                 if run.spec.strip() != Path(spec_path).read_text().strip():
-                    run_file.unlink()  # spec changed: fork again
+                    run = None  # spec changed: fork again
+                    run_file.unlink()
                     answers_file.unlink(missing_ok=True)
-            if not run_file.exists():
+            if run is None:
                 run = await client.fork(Path(spec_path).read_text(), n_samples=a.n)
                 run_file.write_text(run.model_dump_json(indent=1))
             if answers_file.exists() and run.status != "resolved":
                 answers, other = load_answers(str(answers_file))
                 run = await client.resolve(run, answers, other)
                 run_file.write_text(run.model_dump_json(indent=1))
-            if run.status == "resolved":
+            if run.status == "resolved" and run.resolution and run.signature:
                 write_outputs(client, run, a.out, a.module, None)
                 comment.append(f"### SpecFork: `{name}` resolved. Locked {len(run.resolution.locked_cases)} test case(s) "
                                f"in `{a.out}/test_{run.signature.name}.py`.\n")

@@ -31,6 +31,7 @@ class ModelProfile:
     price_per_m: tuple[float, float] | None = None
     max_concurrency: int = 16
     roles: tuple[str, ...] = ()
+    prompts: dict[str, str] = field(default_factory=dict)  # e.g. {"implement": "..."} replaces IMPLEMENT_SYSTEM
 
     @property
     def display(self) -> str:
@@ -97,4 +98,5 @@ def _profile(key: str, d: dict[str, Any]) -> ModelProfile:
         seed=bool(d.get("seed", False)), json_schema=bool(d.get("json_schema", False)),
         price_per_m=(float(price[0]), float(price[1])) if price is not None else None,
         max_concurrency=int(d.get("max_concurrency", 16)), roles=tuple(d.get("roles") or ()),
+        prompts={str(k): str(v) for k, v in (d.get("prompts") or {}).items()},
     )

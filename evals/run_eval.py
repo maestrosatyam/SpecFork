@@ -114,7 +114,10 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
                 ans = await eng._json_call(r1, "sim_user", SIM_USER_FREE_SYSTEM,
                                            f"Spec:\n{item['spec']}\n\nYour intent:\n{item['intent']}\n\nQuestions:\n{json.dumps(qs, indent=1)}",
                                            model=MODEL_FAST, thinking=False, max_tokens=1500, temperature=0.0)
-                decisions = [{"question": a.get("question", ""), "answer": a.get("answer", "")} for a in ans.get("answers") or []]
+                raw_answers = ans.get("answers") if isinstance(ans, dict) else ans
+                decisions = [({"question": a.get("question", ""), "answer": a.get("answer", "")} if isinstance(a, dict)
+                              else {"question": qs[k] if k < len(qs) else "", "answer": str(a)})
+                             for k, a in enumerate(raw_answers or [])]
                 cl = await eng._json_call(r1, "clarify", prompts.CLARIFY_SYSTEM, prompts.clarify_user(item["spec"], decisions),
                                           model=MODEL_DEEP, thinking=False, max_tokens=1500, temperature=0.3)
                 spec1 = str(cl.get("clarified_spec") or item["spec"])

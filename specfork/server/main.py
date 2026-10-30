@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import secrets
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -444,8 +446,19 @@ def create_app(settings: Settings | None = None, router: ModelRouter | None = No
     sandbox.configure(settings.sandbox_require_isolation, settings.sandbox_concurrency)
 
     public = settings.public_demo
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        st: State = app.state.sf
+        st.sandbox_status.update(await sandbox.selftest())
+        if not st.sandbox_status.get("net_isolated"):
+            logging.getLogger("uvicorn.error").warning(
+                "SpecFork sandbox: network isolation is NOT available on this host; model-written code runs with "
+                "weaker isolation (set SANDBOX_REQUIRE_ISOLATION=1 to refuse, or run on Linux/Docker).")
+        yield
+
     app = FastAPI(title="SpecFork", version=__version__, docs_url=None if public else "/docs",
-                  redoc_url=None, openapi_url=None if public else "/openapi.json")
+                  redoc_url=None, openapi_url=None if public else "/openapi.json", lifespan=lifespan)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -467,6 +480,7 @@ def create_app(settings: Settings | None = None, router: ModelRouter | None = No
     )
     app.state.sf = state
     app.include_router(api)
+
 
     candidates = [Path(web_dist)] if web_dist else [
         Path(os.environ["WEB_DIST"]) if os.environ.get("WEB_DIST") else None,

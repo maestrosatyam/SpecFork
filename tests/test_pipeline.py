@@ -204,3 +204,26 @@ def test_render_tests_module_option():
     sig = validate_signature(FRAME)
     code = render_tests(sig, [{"input_id": "i0", "args": {"total": 1, "n": 1}, "expected_repr": "[1]"}], "spec", module="billing.split")
     assert "from billing.split import split_bill" in code
+
+
+async def test_profile_prompt_override(tmp_path):
+    import httpx
+
+    from specfork.llm import ModelRouter
+    from specfork.registry import Registry
+
+    f = tmp_path / "specfork.toml"
+    f.write_text('[models.lightning]\nprompts = { implement = "You are a senior Python developer. OVERRIDE." }\n')
+    seen = []
+    base = make_transport()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.content.decode())
+        return base.handle_request(request)
+
+    router = ModelRouter(Registry.load(f), {"NEBIUS_API_KEY": "t"}, transport=httpx.MockTransport(handler))
+    eng = SpecFork(router, lambda run: None)
+    run = new_run("t8", SPEC, 4)
+    await eng.run_all(run)
+    assert any("OVERRIDE" in s for s in seen)
+    await router.aclose()

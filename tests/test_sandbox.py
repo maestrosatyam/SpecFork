@@ -187,3 +187,11 @@ async def test_no_process_creation_in_child():
                   capture_output=True, env={"PATH": "/usr/bin:/bin"}, timeout=20).stdout
     res = _json.loads(out)
     assert res["outcomes"]["a"]["ok"] is False  # BlockingIOError / PermissionError from RLIMIT_NPROC
+
+
+def test_security_doc_matches_harness_limits():
+    harness = Path("specfork/_harness.py").read_text()
+    doc = Path("docs/SECURITY.md").read_text()
+    assert "RLIMIT_AS, (512 * 1024 * 1024" in harness and "512 MB" in doc
+    assert "RLIMIT_NPROC, (0, 0)" in harness and "RLIMIT_NPROC" in doc
+    assert "768" not in doc

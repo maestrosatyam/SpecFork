@@ -248,6 +248,13 @@ class SpecFork:
         run["updated_at"] = now()
         self.notify(run)
 
+    def _system(self, name: str, model: str, default: str) -> str:
+        """System prompt ``name`` (frame, implement, explain, assumptions, clarify), overridable per model profile."""
+        try:
+            return self.client.profile(model).prompts.get(name, default)
+        except Exception:  # noqa: BLE001 - unknown model: use the default prompt
+            return default
+
     async def _chat(self, run: dict[str, Any], purpose: str, messages: list[dict[str, Any]], **kw: Any):
         trace: list[CallRecord] = []
         try:
@@ -264,6 +271,7 @@ class SpecFork:
         last: Exception | None = None
         for attempt in range(retries + 1):
             think = thinking and not (fallback_no_thinking and attempt > 0)
+            system = self._system(purpose, model, system)
             res = await self._chat(run, purpose, [{"role": "system", "content": system}, {"role": "user", "content": user}],
                                    model=model, thinking=think, max_tokens=max_tokens, temperature=temperature,
                                    effort=effort if think else None, json_mode=True)
@@ -310,7 +318,7 @@ class SpecFork:
                         seed: int, purpose: str) -> None:
         sig = run["signature"]
         try:
-            res = await self._chat(run, purpose, [{"role": "system", "content": prompts.IMPLEMENT_SYSTEM},
+            res = await self._chat(run, purpose, [{"role": "system", "content": self._system("implement", impl["model"], prompts.IMPLEMENT_SYSTEM)},
                                                   {"role": "user", "content": prompts.implement_user(spec, sig)}],
                                    model=impl["model"], thinking=False, max_tokens=1800, temperature=1.0, seed=seed)
         except LLMError as e:
@@ -362,7 +370,7 @@ class SpecFork:
                 impl["cluster_id"] = cr.impl_cluster[impl["id"]]
         run["clusters"] = cr.clusters
         rep = {c["id"]: ex[c["representative_impl_id"]] for c in cr.clusters}
-        cost = {i["id"]: len(json.dumps(i["args"])) for i in run["inputs"]}
+        cost: dict[str, float] = {i["id"]: float(len(json.dumps(i["args"]))) for i in run["inputs"]}
         axes = find_axes(cr.clusters, rep, ids, input_cost=cost)
         live = [c for c in cr.clusters if c["kind"] == "behavior"]
         self._log(run, "cluster", f"{len(ex)} implementations → {len(live)} distinct behaviours"
@@ -413,8 +421,11 @@ class SpecFork:
         except (LLMError, PipelineError) as e:
             self._log(run, "explain", f"Explainer unavailable ({str(e)[:80]}); using raw witness questions")
             raw = {"axes": []}
+        if not isinstance(raw, dict):
+            raw = {"axes": []}
         by_label = {c["label"]: c for c in run["clusters"]}
-        for lab, summ in (raw.get("cluster_summaries") or {}).items():
+        summaries = raw.get("cluster_summaries")
+        for lab, summ in (summaries.items() if isinstance(summaries, dict) else []):
             if lab in by_label:
                 by_label[lab]["summary"] = str(summ)[:160]
         expl = {a.get("axis_id"): a for a in raw.get("axes") or [] if isinstance(a, dict)}

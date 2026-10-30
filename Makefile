@@ -29,8 +29,9 @@ test: ## backend + frontend tests (offline, no API key needed)
 	$(UV) run pytest -q
 	cd web && npm test --silent
 
-lint: ## ruff lint
+lint: ## ruff lint + basedpyright type check
 	$(UV) run ruff check .
+	$(UV) run basedpyright
 
 typecheck: ## TypeScript typecheck of the frontend
 	cd web && npm run typecheck

@@ -101,7 +101,8 @@ def find_axes(
     # Prefer the clearest witnesses: inputs where no behaviour raises, then the simplest inputs.
     cost = input_cost or {}
     for ax in axes.values():
-        ax.witness_input_ids.sort(key=lambda i: (sum(1 for _, v in ax.group_values[i] if v == "raises"),
+        gv = ax.group_values
+        ax.witness_input_ids.sort(key=lambda i: (sum(1 for _, v in gv[i] if v == "raises"),
                                                  cost.get(i, 0.0), input_ids.index(i)))
         keep = ax.witness_input_ids[:max_witnesses_per_axis]
         ax.group_values = {i: ax.group_values[i] for i in keep}

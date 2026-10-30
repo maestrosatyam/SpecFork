@@ -32,6 +32,7 @@ dev = [
   "pytest==9.2.0",
   "pytest-asyncio==1.4.1",
   "ruff==0.8.4",
+  "basedpyright==1.40.2",
 ]
 
 [project.scripts]
@@ -66,3 +67,8 @@ ignore = ["E501", "B008", "UP038", "B904"]
 "tests/*" = ["S", "B", "E731", "BLE"]
 "specfork/_harness.py" = ["E402", "S102", "BLE001", "B"]
 "evals/*" = ["E402", "BLE001"]
+
+[tool.basedpyright]
+include = ["specfork"]
+typeCheckingMode = "standard"
+pythonVersion = "3.11"

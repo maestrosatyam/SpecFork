@@ -27,7 +27,7 @@ sys.setrecursionlimit(2000)
 try:
     import os as _os_mod
 
-    _os_mod.unshare(_os_mod.CLONE_NEWUSER | _os_mod.CLONE_NEWNET)
+    getattr(_os_mod, "unshare")(getattr(_os_mod, "CLONE_NEWUSER") | getattr(_os_mod, "CLONE_NEWNET"))  # Linux only
     NET_ISOLATED = True
 except Exception:
     NET_ISOLATED = False
