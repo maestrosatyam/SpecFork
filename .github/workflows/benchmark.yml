@@ -32,7 +32,7 @@ jobs:
           NEBIUS_API_KEY: ${{ secrets.NEBIUS_API_KEY }}
           SPECFORK_FAST_MODEL: ${{ matrix.profile.fast }}
           SPECFORK_DEEP_MODEL: ${{ matrix.profile.deep }}
-        run: uv run python evals/run_eval.py --n "${{ github.event.inputs.n || '12' }}" --concurrency 4 --out evals/results
+        run: uv run python evals/run_eval.py --n "${{ github.event.inputs.n || '12' }}" --repeats 3 --concurrency 4 --out evals/results
       - uses: actions/upload-artifact@v4
         with:
           name: benchmark-${{ matrix.profile.fast }}-${{ matrix.profile.deep }}

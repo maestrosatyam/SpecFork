@@ -86,14 +86,15 @@ async def reference_outcomes(item: dict[str, Any], inputs: list[dict[str, Any]])
     return {k: outcome_key(v) for k, v in res.outcomes.items()}
 
 
-async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyncio.Semaphore) -> dict[str, Any]:
+async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyncio.Semaphore, rep: int = 0) -> dict[str, Any]:
     async with sem:
         t0 = time.perf_counter()
         sig = {**item["signature"], "docstring": ""}
         hidden = [{"id": f"h{k}", "args": a} for k, a in enumerate(item["test_inputs"])]
         expected = await reference_outcomes(item, hidden)
-        out: dict[str, Any] = {"id": item["id"], "ambiguous": item["ambiguous"], "n_axes": len(item["axes"]), "conditions": {}}
-        seed = sum(map(ord, item["id"])) * 1000
+        out: dict[str, Any] = {"id": item["id"], "rep": rep, "ambiguous": item["ambiguous"], "n_axes": len(item["axes"]),
+                               "conditions": {}}
+        seed = sum(map(ord, item["id"])) * 1000 + rep * 7919
 
         # ---------------- B0
         r0 = new_run(f"b0-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP)
@@ -216,7 +217,15 @@ def bootstrap_ci(values: list[float], iters: int = 5000, seed: int = 0) -> tuple
 
 def summarize(results: list[dict[str, Any]], n: int) -> str:
     def agg(cond: str, amb: bool) -> dict[str, Any]:
-        rows = [r["conditions"][cond] for r in results if r["ambiguous"] == amb and "alignment" in r["conditions"].get(cond, {})]
+        # average repeats per item first, so items (not repeats) are the unit of the bootstrap
+        per_item: dict[str, list[dict[str, Any]]] = {}
+        for r in results:
+            if r["ambiguous"] == amb and "alignment" in r["conditions"].get(cond, {}):
+                per_item.setdefault(r["id"], []).append(r["conditions"][cond])
+        rows = [{"alignment": statistics.mean(x["alignment"] for x in v),
+                 "aligned": sum(x["aligned"] for x in v), "executed": sum(x["executed"] for x in v),
+                 "questions": statistics.mean(x["questions"] for x in v), "cost_usd": sum(x["cost_usd"] for x in v)}
+                for v in per_item.values()]
         if not rows:
             return {}
         return {
@@ -254,6 +263,7 @@ async def main() -> int:
     ap.add_argument("--n", type=int, default=12)
     ap.add_argument("--items", default="")
     ap.add_argument("--concurrency", type=int, default=3)
+    ap.add_argument("--repeats", type=int, default=1, help="run every item this many times with different seeds")
     ap.add_argument("--out", default=str(ROOT / "evals" / "results"))
     args = ap.parse_args()
     items = json.loads((ROOT / "evals" / "benchmark" / "specs.json").read_text())
@@ -270,12 +280,12 @@ async def main() -> int:
     client = ModelRouter(registry, settings.api_keys, max_concurrency=12, default_model=settings.fast_model)
     sem = asyncio.Semaphore(args.concurrency)
     t0 = time.time()
-    results = await asyncio.gather(*(eval_item(i, client, args.n, sem) for i in items))
+    results = await asyncio.gather(*(eval_item(i, client, args.n, sem, rep) for rep in range(args.repeats) for i in items))
     await client.aclose()
     stamp = time.strftime("%Y%m%d-%H%M%S")
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
-    meta = {"timestamp": stamp, "n": args.n, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "implementers": IMPLEMENTERS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
+    meta = {"timestamp": stamp, "n": args.n, "repeats": args.repeats, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "implementers": IMPLEMENTERS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
             "prompt_version": prompts.PROMPT_VERSION, "wall_s": round(time.time() - t0, 1), "items": len(items)}
     (outdir / f"eval-{stamp}.json").write_text(json.dumps({"meta": meta, "results": results}, indent=1))
     summary = summarize(results, args.n)
