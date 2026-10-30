@@ -25,6 +25,7 @@ MODEL_DEEP: "${MODEL_DEEP:-nvidia/Nemotron-3-Ultra-550b-a55b}"
 DAILY_BUDGET_USD: "${DAILY_BUDGET_USD:-5}"
 RATE_LIMIT_RUNS: "${RATE_LIMIT_RUNS:-6}"
 SANDBOX_CONCURRENCY: "2"
+SANDBOX_REQUIRE_ISOLATION: "1"
 LLM_CONCURRENCY: "16"
 YAML
 # --no-cpu-throttling: runs continue in background tasks after the POST returns
