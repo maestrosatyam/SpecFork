@@ -227,3 +227,23 @@ async def test_profile_prompt_override(tmp_path):
     await eng.run_all(run)
     assert any("OVERRIDE" in s for s in seen)
     await router.aclose()
+
+
+async def test_exception_types_option_locks_exception_class(tmp_path):
+    import subprocess
+    import sys
+
+    eng, client = _engine()
+    run = new_run("t9", SPEC, 8, exception_types=True)
+    await eng.run_all(run)
+    reprs = {o["value_repr"] for i in run["implementations"] if i.get("outcomes") for o in i["outcomes"].values() if not o["ok"]}
+    assert reprs and all(r.startswith("raises:") for r in reprs)
+    answers = {q["id"]: q["options"][0]["id"] for q in run["questions"] if q["kind"] in ("ambiguity", "assumption")}
+    await eng.resolve(run, answers)
+    res = run["resolution"]
+    assert any(c["expected_repr"].startswith("raises:") for c in res["locked_cases"])
+    (tmp_path / "solution.py").write_text(res["reference_code"])
+    (tmp_path / "test_locked.py").write_text(res["tests_code"])
+    r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(tmp_path)], capture_output=True, text=True, cwd=tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+    await client.aclose()

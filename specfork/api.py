@@ -43,13 +43,14 @@ class Client:
 
     def new_run(self, spec: str, *, n_samples: int = 24, fast_model: str | None = None, deep_model: str | None = None,
                 implementers: list[str] | None = None, assumptions: bool | None = None,
-                signature: dict[str, Any] | None = None) -> dict[str, Any]:
+                signature: dict[str, Any] | None = None, exception_types: bool | None = None) -> dict[str, Any]:
         fast = self.registry.get(fast_model or self.settings.fast_model)
         deep = self.registry.get(deep_model or self.settings.deep_model)
         impl_keys = implementers or ([fast.key] if fast_model else self.settings.implementer_keys)
         run = new_run(secrets.token_urlsafe(12), spec, n_samples, None, fast.model, deep.model,
                       implementers=[self.registry.get(k).model for k in impl_keys],
-                      assumptions=self.settings.assumptions if assumptions is None else assumptions)
+                      assumptions=self.settings.assumptions if assumptions is None else assumptions,
+                      exception_types=self.settings.exception_types if exception_types is None else exception_types)
         if signature:
             run["signature"] = {**signature, "docstring": signature.get("docstring", "")}
         return run

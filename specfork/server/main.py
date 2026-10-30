@@ -84,6 +84,7 @@ class CreateRun(BaseModel):
     fast_model: str | None = Field(default=None, max_length=64)
     deep_model: str | None = Field(default=None, max_length=64)
     assumptions: bool | None = None
+    exception_types: bool | None = None
 
 
 class Answers(BaseModel):
@@ -246,7 +247,8 @@ async def create_run(body: CreateRun, request: Request) -> dict[str, str]:
                     [st.registry.get(k).model for k in st.settings.implementer_keys])
     run = new_run(secrets.token_urlsafe(12), spec, body.n_samples, body.preset_id, fast.model, deep.model,
                   implementers=implementers,
-                  assumptions=st.settings.assumptions if body.assumptions is None else body.assumptions)
+                  assumptions=st.settings.assumptions if body.assumptions is None else body.assumptions,
+                  exception_types=st.settings.exception_types if body.exception_types is None else body.exception_types)
     token = secrets.token_urlsafe(24)
     st.store.add(run)
     st.store.set_token(run["id"], token)

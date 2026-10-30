@@ -52,7 +52,8 @@ DEFAULT_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
 
 def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None,
             fast_model: str = DEFAULT_FAST, deep_model: str = DEFAULT_DEEP, *,
-            implementers: list[str] | None = None, assumptions: bool = True) -> dict[str, Any]:
+            implementers: list[str] | None = None, assumptions: bool = True,
+            exception_types: bool = False) -> dict[str, Any]:
     """A fresh run record. Model arguments are model ids (or registry keys) resolved by the ModelRouter."""
     t = now()
     return {
@@ -60,6 +61,7 @@ def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None
         "spec": spec, "preset_id": preset_id, "is_sample": False,
         "settings": {"n_samples": n_samples, "fast_model": fast_model, "deep_model": deep_model,
                      "implementers": list(implementers or [fast_model]), "assumptions": assumptions,
+                     "exception_types": exception_types,
                      "prompt_version": prompts.PROMPT_VERSION, "prompt_hash": prompts.prompt_hash()},
         "inputs": [], "implementations": [], "clusters": [], "questions": [], "trace": [],
         "metrics": {"total_cost_usd": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "n_calls": 0, "wall_time_s": 0.0},
@@ -226,6 +228,10 @@ def test_{fname}(args_json, expected):
     if expected == RAISES:
         with pytest.raises(Exception):
             {fname}(**args)
+    elif expected.startswith(RAISES + ":"):
+        with pytest.raises(Exception) as err:
+            {fname}(**args)
+        assert type(err.value).__name__ == expected.split(":", 1)[1]
     else:
         assert canon({fname}(**args)) == expected
 '''
@@ -339,6 +345,10 @@ class SpecFork:
         if not ex.ok:
             impl["status"], impl["reject_reason"] = "error", f"execution failed: {ex.error}"
         else:
+            if run["settings"].get("exception_types"):
+                for o in ex.outcomes.values():
+                    if not o.get("ok"):
+                        o["value_repr"] = f"raises:{o.get('error_type') or 'Exception'}"
             impl["status"], impl["outcomes"] = "executed", ex.outcomes
         self.notify(run)
 

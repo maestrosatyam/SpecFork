@@ -67,6 +67,17 @@
       ],
       "title": "Deep Model"
      },
+     "exception_types": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exception Types"
+     },
      "fast_model": {
       "anyOf": [
        {

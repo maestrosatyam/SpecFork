@@ -132,7 +132,7 @@ async def cmd_fork(a: argparse.Namespace) -> int:
         t0 = time.perf_counter()
         try:
             run = await client.fork(spec, n_samples=a.n, fast_model=a.fast, deep_model=a.deep,
-                                    assumptions=not a.no_assumptions)
+                                    assumptions=not a.no_assumptions, exception_types=a.exception_types or None)
         except ForkError as e:
             _p(f"error: {e}", err=True)
             return 1
@@ -341,6 +341,8 @@ def build_parser() -> argparse.ArgumentParser:
     f.add_argument("--fast", help="model profile for framing/fan-out (default from settings)")
     f.add_argument("--deep", help="model profile for explanations (default from settings)")
     f.add_argument("--no-assumptions", action="store_true", help="skip the silent-assumption review")
+    f.add_argument("--exception-types", action="store_true",
+                   help="treat ValueError vs TypeError etc. as different behaviours and lock the type in tests")
     common(f)
     f.set_defaults(func=cmd_fork, is_async=True)
 

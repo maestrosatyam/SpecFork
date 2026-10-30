@@ -12,10 +12,14 @@ LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def outcome_key(o: dict[str, Any] | None) -> str:
-    """Comparable behaviour token for one outcome. All exceptions compare equal ("raises")."""
+    """Comparable behaviour token for one outcome. Exceptions compare equal ("raises") unless the run was made
+    with exception types on, in which case outcomes carry "raises:<ExceptionType>"."""
     if o is None:
         return "missing"
-    return o["value_repr"] if o.get("ok") else "raises"
+    if o.get("ok"):
+        return o["value_repr"]
+    rep = o.get("value_repr") or ""
+    return rep if rep.startswith("raises:") else "raises"
 
 
 @dataclass
