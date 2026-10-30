@@ -29,10 +29,18 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+
+def load_env() -> None:
+    """Load .env (do not import app.main for this: it removes the key from os.environ)."""
+    if (ROOT / ".env").exists():
+        for line in (ROOT / ".env").read_text().splitlines():
+            if "=" in line and not line.lstrip().startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
 from app import prompts  # noqa: E402
-from app.cluster import outcome_key  # noqa: E402
+from app.cluster import compatible_option_ids, outcome_key  # noqa: E402
 from app.llm import MODEL_DEEP, MODEL_FAST, NebiusClient, extract_json  # noqa: E402
-from app.main import _load_dotenv  # noqa: E402,F401  (loads .env)
 from app.pipeline import SpecFork, add_trace, extract_code, new_run  # noqa: E402
 from app.sandbox import check_code, exec_semaphore, run_function  # noqa: E402
 
@@ -126,18 +134,24 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
             if rs["status"] != "awaiting_answers":
                 raise RuntimeError(rs.get("error"))
             inputs = {i["id"]: i for i in rs["inputs"]}
-            answers = {}
+            answers = {q["id"]: q["answer_option_id"] for q in rs["questions"]
+                       if q["kind"] == "likely_bug" and q.get("answer_option_id")}
             for q in rs["questions"]:
                 if q["kind"] != "ambiguity":
                     continue
+                ok_ids = set(compatible_option_ids(rs["questions"], answers, q["id"], rs["clusters"])) or {o["id"] for o in q["options"]}
+                cands = [o for o in q["options"] if o["id"] in ok_ids]
+                if len(cands) == 1:
+                    answers[q["id"]] = cands[0]["id"]
+                    continue
                 opts = [{"id": o["id"], "answer": o["label"],
                          "examples": [f"{sig['name']}(**{json.dumps(inputs[e['input_id']]['args'])}) -> {e['value_repr']}" for e in o["examples"]]}
-                        for o in q["options"]]
+                        for o in cands]
                 pick = await eng._json_call(rs, "sim_user", SIM_USER_SYSTEM,
                                             f"Spec:\n{item['spec']}\n\nYour intent:\n{item['intent']}\n\nQuestion: {q['text']}\nOptions:\n{json.dumps(opts, indent=1)}",
                                             model=MODEL_FAST, thinking=False, max_tokens=300, temperature=0.0)
                 oid = pick.get("option")
-                answers[q["id"]] = oid if any(o["id"] == oid for o in q["options"]) else q["options"][0]["id"]
+                answers[q["id"]] = oid if any(o["id"] == oid for o in cands) else cands[0]["id"]
             await eng.resolve(rs, answers)
             res = rs["resolution"]
             rs["hidden_inputs"] = hidden
@@ -215,6 +229,7 @@ async def main() -> int:
     ap.add_argument("--concurrency", type=int, default=3)
     ap.add_argument("--out", default=str(ROOT / "evals" / "results"))
     args = ap.parse_args()
+    load_env()
     if not os.environ.get("NEBIUS_API_KEY"):
         print("NEBIUS_API_KEY missing", file=sys.stderr)
         return 2

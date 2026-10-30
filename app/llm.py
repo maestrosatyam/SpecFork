@@ -94,7 +94,7 @@ class NebiusClient:
         max_retries: int = 4,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        self.api_key = api_key or os.environ.get("NEBIUS_API_KEY", "")
+        self.api_key = os.environ.get("NEBIUS_API_KEY", "") if api_key is None else api_key
         self.base_url = base_url.rstrip("/")
         self.sem = asyncio.Semaphore(max_concurrency)
         self.timeout_s = timeout_s

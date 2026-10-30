@@ -154,3 +154,18 @@ def agreement(outcomes: dict[str, dict[str, dict[str, Any]]], expected: dict[str
         if all(outcome_key(per_input.get(i)) == k for i, k in expected.items()):
             passed += 1
     return passed, n
+
+
+def compatible_option_ids(questions: list[dict[str, Any]], answers: dict[str, str], question_id: str,
+                          clusters: list[dict[str, Any]]) -> list[str]:
+    """Options of ``question_id`` that at least one behaviour satisfies together with the other answers."""
+    alive = {c["id"] for c in clusters if c["kind"] != "crash"}
+    for q in questions:
+        if q["id"] == question_id:
+            continue
+        oid = answers.get(q["id"])
+        opt = next((o for o in q["options"] if o["id"] == oid), None)
+        if opt is not None:
+            alive &= set(opt["cluster_ids"])
+    q = next(q for q in questions if q["id"] == question_id)
+    return [o["id"] for o in q["options"] if alive & set(o["cluster_ids"])]

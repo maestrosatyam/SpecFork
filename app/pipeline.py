@@ -495,7 +495,8 @@ class SpecFork:
                                 for i in dict.fromkeys(ordered) if i in by_id][:16]
                     raw = await self._json_call(run, "clarify", prompts.CLARIFY_SYSTEM,
                                                 prompts.clarify_user(run["spec"], decisions, chosen_impl.get("code") or "", examples),
-                                                model=run["settings"]["deep_model"], thinking=False, max_tokens=1500, temperature=0.3)
+                                                model=run["settings"]["deep_model"], thinking=True, max_tokens=10000, temperature=0.3,
+                                                template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
                     clarified = str(raw.get("clarified_spec") or "").strip() or clarified
                     if raw.get("decisions"):
                         run["resolution"]["decisions"] = [str(d)[:240] for d in raw["decisions"]][:8]

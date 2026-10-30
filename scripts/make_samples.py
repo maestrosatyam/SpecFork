@@ -16,6 +16,9 @@ from pathlib import Path
 
 import httpx
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app.cluster import compatible_option_ids  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]
 ANSWER_HINTS = {"split_bill": ["first", "add up", "sum"], "business_days": ["exclud", "not count"],
                 "dedupe_emails": ["first", "original"], "round_grade": ["90"], "truncate": ["includ", "total"],
@@ -52,12 +55,15 @@ def main() -> int:
         if run["status"] == "error":
             print("  error:", run.get("error"))
             continue
-        answers = {}
+        answers = {q["id"]: q["answer_option_id"] for q in run["questions"]
+                   if q["kind"] == "likely_bug" and q.get("answer_option_id")}
         for q in run["questions"]:
             if q["kind"] != "ambiguity":
                 continue
+            ok = set(compatible_option_ids(run["questions"], answers, q["id"], run["clusters"]))
+            cands = [o for o in q["options"] if o["id"] in ok] or q["options"]
             hints = ANSWER_HINTS.get(p["id"], [])
-            pick = next((o for h in hints for o in q["options"] if h in o["label"].lower()), q["options"][0])
+            pick = next((o for h in hints for o in cands if h in o["label"].lower()), cands[0])
             answers[q["id"]] = pick["id"]
             print(f"  Q: {q['text']}\n     -> {pick['label']}")
         c.post(f"/api/runs/{rid}/answers", json={"answers": answers})
