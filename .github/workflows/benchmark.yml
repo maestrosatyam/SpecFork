@@ -24,8 +24,8 @@ jobs:
         profile:
           - { fast: lightning, deep: ultra }
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --extra dev --frozen --python 3.12
       - name: Run benchmark
         env:
@@ -33,7 +33,7 @@ jobs:
           SPECFORK_FAST_MODEL: ${{ matrix.profile.fast }}
           SPECFORK_DEEP_MODEL: ${{ matrix.profile.deep }}
         run: uv run python evals/run_eval.py --n "${{ github.event.inputs.n || '12' }}" --repeats 3 --concurrency 4 --out evals/results
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: benchmark-${{ matrix.profile.fast }}-${{ matrix.profile.deep }}
           path: evals/results/
