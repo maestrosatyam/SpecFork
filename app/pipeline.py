@@ -352,7 +352,8 @@ class SpecFork:
         inputs = {i["id"]: i for i in run["inputs"]}
         if not axes:
             run["questions"] = []
-            self._log(run, "explain", "All implementations agree on every probe — no questions needed")
+            self._log(run, "explain", "All implementations agree on every probe; looking for silent assumptions")
+            await self.assumptions(run)
             return
         axes_payload, group_maps = [], []
         for k, ax in enumerate(axes):
@@ -409,6 +410,11 @@ class SpecFork:
                 })
             options.sort(key=lambda o: -o["impl_count"])
             kind = "likely_bug" if e.get("kind") == "likely_bug" else "ambiguity"
+            if kind == "likely_bug":
+                n_exec = sum(c["size"] for c in run["clusters"]) or 1
+                bug_mass = sum(o["impl_count"] for o in options if o["id"] in {f"q{k}{g}" for g in (e.get("bug_groups") or [])})
+                if not e.get("bug_groups") or bug_mass / n_exec >= 0.25:
+                    kind = "ambiguity"  # too many implementations do it to call it a bug
             q = {
                 "id": f"q{k}", "kind": kind,
                 "text": str(e.get("question") or f"What should {run['signature']['name']} return for "
@@ -426,6 +432,57 @@ class SpecFork:
         run["questions"] = questions
         n_amb = sum(1 for q in questions if q["kind"] == "ambiguity")
         self._log(run, "explain", f"{n_amb} clarifying question(s), {len(questions) - n_amb} likely bug(s)")
+        await self.assumptions(run)
+
+    async def assumptions(self, run: dict[str, Any]) -> None:
+        """Ask the deep model which consequential decisions every (or the majority) implementation made silently."""
+        live = [c for c in run["clusters"] if c["kind"] == "behavior"]
+        if not live:
+            return
+        impls = {i["id"]: i for i in run["implementations"]}
+        major = live[0]
+        rep = impls[major["representative_impl_id"]]
+        outputs = [{"id": i["id"], "args": i["args"], "output": outcome_key(rep["outcomes"].get(i["id"]))[:160]}
+                   for i in run["inputs"]]
+        open_qs = [q["text"] for q in run["questions"]]
+        n_total = sum(c["size"] for c in run["clusters"])
+        self._log(run, "explain", f"Asking {run['settings']['deep_model']} for silent assumptions behind behaviour {major['label']}")
+        try:
+            raw = await self._json_call(run, "assumptions", prompts.ASSUME_SYSTEM,
+                                        prompts.assume_user(run["spec"], run["signature"], rep.get("code") or "", outputs,
+                                                            major["size"], n_total, open_qs),
+                                        model=run["settings"]["deep_model"], thinking=True, max_tokens=12000, temperature=0.5,
+                                        template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
+        except (LLMError, PipelineError) as e:
+            self._log(run, "explain", f"Assumption review unavailable ({str(e)[:80]})")
+            return
+        valid_ids = {i["id"] for i in run["inputs"]}
+        added = 0
+        for k, a in enumerate((raw.get("assumptions") or [])[:3]):
+            if not isinstance(a, dict) or not a.get("question") or not a.get("alternative_label"):
+                continue
+            affected = [i for i in (a.get("input_ids") or []) if isinstance(i, str) and i in valid_ids]
+            # clusters that behave like the majority on the affected inputs keep the assumption
+            keep_ids = [c["id"] for c in live
+                        if all(outcome_key(impls[c["representative_impl_id"]]["outcomes"].get(i)) == outcome_key(rep["outcomes"].get(i))
+                               for i in affected)]
+            qid = f"a{k}"
+            run["questions"].append({
+                "id": qid, "kind": "assumption",
+                "text": str(a["question"])[:300], "why": str(a.get("why") or "")[:300],
+                "witness_input_ids": affected[:3], "affected_input_ids": affected,
+                "agree_count": sum(c["size"] for c in live if c["id"] in keep_ids),
+                "options": [
+                    {"id": f"{qid}keep", "label": humanize_label(str(a.get("consensus_label") or "Keep the current behaviour"))[:140],
+                     "cluster_ids": keep_ids, "impl_count": sum(c["size"] for c in live if c["id"] in keep_ids),
+                     "examples": [{"input_id": i, "value_repr": outcome_key(rep["outcomes"].get(i))} for i in affected[:2]]},
+                    {"id": f"{qid}alt", "label": humanize_label(str(a["alternative_label"]))[:140], "cluster_ids": [],
+                     "impl_count": 0, "examples": [], "is_alternative": True,
+                     "note": str(a.get("alternative_example") or "")[:200]},
+                ],
+            })
+            added += 1
+        self._log(run, "explain", f"{added} silent assumption(s) found")
 
     async def run_all(self, run: dict[str, Any]) -> None:
         t0 = time.perf_counter()
@@ -450,15 +507,24 @@ class SpecFork:
         try:
             qs = {q["id"]: q for q in run["questions"]}
             chosen_sets, decisions = [], []
+            overrides: set[str] = set()
             for q in run["questions"]:
                 oid = answers.get(q["id"]) or q.get("answer_option_id")
                 opt = next((o for o in q["options"] if o["id"] == oid), None)
                 if opt is None:
-                    if q["kind"] == "ambiguity":
+                    if q["kind"] in ("ambiguity", "assumption"):
                         raise PipelineError(f"question {q['id']} not answered")
                     continue
                 q["answer_option_id"] = opt["id"]
+                if opt.get("is_alternative"):
+                    overrides.update(q.get("affected_input_ids") or [])
+                    decisions.append({"question": q["text"], "answer": opt["label"], "example": opt.get("note", ""),
+                                      "note": "Overrides what the implementations assumed."})
+                    continue
                 chosen_sets.append(set(opt["cluster_ids"]))
+                if not opt["examples"]:
+                    decisions.append({"question": q["text"], "answer": opt["label"]})
+                    continue
                 ex = opt["examples"][0]
                 decisions.append({"question": q["text"], "answer": opt["label"],
                                   "example": f"{run['signature']['name']}(**{json.dumps(next(i for i in run['inputs'] if i['id'] == ex['input_id'])['args'])}) -> {ex['value_repr']}"})
@@ -471,7 +537,7 @@ class SpecFork:
             chosen_impl = next(i for i in run["implementations"] if i["id"] == clusters[best]["representative_impl_id"])
             inputs = {i["id"]: i for i in run["inputs"]}
             locked = [{"input_id": iid, "args": inputs[iid]["args"], "expected_repr": outcome_key(o)}
-                      for iid, o in chosen_impl["outcomes"].items()]
+                      for iid, o in chosen_impl["outcomes"].items() if iid not in overrides]
             expected = {c["input_id"]: c["expected_repr"] for c in locked}
             ex = {i["id"]: i["outcomes"] for i in run["implementations"] if i["status"] == "executed"}
             passed, n = agreement(ex, expected)
@@ -482,6 +548,7 @@ class SpecFork:
                 "clarified_spec": "", "decisions": [f"{d['question']} → {d['answer']}" for d in decisions],
                 "tests_code": "", "reference_code": chosen_impl["code"], "locked_cases": locked,
                 "agreement_before": round(passed / n, 4) if n else 0.0, "agreement_before_counts": [passed, n],
+                "unlocked_input_ids": sorted(overrides),
             }
             self._log(run, "resolve", f"Chosen behaviour {clusters[best]['label']}: {passed}/{n} original implementations already matched it")
             clarified = run["spec"]

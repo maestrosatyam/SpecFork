@@ -63,6 +63,12 @@ def make_transport(counter: dict | None = None) -> httpx.MockTransport:
                 key = ORDER[state["impl"] % len(ORDER)]
                 state["impl"] += 1
             content, reasoning = f"```python\n{IMPLS[key]}```", None
+        elif "SILENT ASSUMPTIONS" in system:
+            content = json.dumps({"assumptions": [{
+                "question": "Should a $0 bill be split at all?", "why": "Zero bills may be data errors.",
+                "consensus_label": "Everyone pays 0.0", "alternative_label": "Raise an error for a $0 bill",
+                "input_ids": ["i999", "i3"], "alternative_example": "split_bill(0, 2) -> raises"}]})
+            reasoning = "All implementations return zeros."
         elif "requirements analyst" in system:
             content, reasoning = json.dumps(EXPLAIN), "Group g0 sums to total; others lose or add cents."
         elif "rewrite a function spec" in system:

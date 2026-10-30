@@ -165,7 +165,7 @@ def compatible_option_ids(questions: list[dict[str, Any]], answers: dict[str, st
             continue
         oid = answers.get(q["id"])
         opt = next((o for o in q["options"] if o["id"] == oid), None)
-        if opt is not None:
+        if opt is not None and not opt.get("is_alternative"):
             alive &= set(opt["cluster_ids"])
     q = next(q for q in questions if q["id"] == question_id)
-    return [o["id"] for o in q["options"] if alive & set(o["cluster_ids"])]
+    return [o["id"] for o in q["options"] if o.get("is_alternative") or alive & set(o["cluster_ids"])]

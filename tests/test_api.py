@@ -45,7 +45,7 @@ async def test_run_lifecycle(api):
     rid = r.json()["id"]
     run = await _wait(api, rid, {"awaiting_answers", "error"})
     assert run["status"] == "awaiting_answers", run.get("error")
-    answers = {q["id"]: q["options"][0]["id"] for q in run["questions"] if q["kind"] == "ambiguity"}
+    answers = {q["id"]: q["options"][0]["id"] for q in run["questions"] if q["kind"] in ("ambiguity", "assumption")}
     r = await api.post(f"/api/runs/{rid}/answers", json={"answers": answers})
     assert r.status_code == 200
     run = await _wait(api, rid, {"resolved"})

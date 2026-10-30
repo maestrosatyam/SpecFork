@@ -137,7 +137,7 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
             answers = {q["id"]: q["answer_option_id"] for q in rs["questions"]
                        if q["kind"] == "likely_bug" and q.get("answer_option_id")}
             for q in rs["questions"]:
-                if q["kind"] != "ambiguity":
+                if q["kind"] not in ("ambiguity", "assumption"):
                     continue
                 ok_ids = set(compatible_option_ids(rs["questions"], answers, q["id"], rs["clusters"])) or {o["id"] for o in q["options"]}
                 cands = [o for o in q["options"] if o["id"] in ok_ids]
@@ -145,7 +145,8 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
                     answers[q["id"]] = cands[0]["id"]
                     continue
                 opts = [{"id": o["id"], "answer": o["label"],
-                         "examples": [f"{sig['name']}(**{json.dumps(inputs[e['input_id']]['args'])}) -> {e['value_repr']}" for e in o["examples"]]}
+                         "examples": [f"{sig['name']}(**{json.dumps(inputs[e['input_id']]['args'])}) -> {e['value_repr']}" for e in o["examples"]]
+                                     + ([o["note"]] if o.get("note") else [])}
                         for o in cands]
                 pick = await eng._json_call(rs, "sim_user", SIM_USER_SYSTEM,
                                             f"Spec:\n{item['spec']}\n\nYour intent:\n{item['intent']}\n\nQuestion: {q['text']}\nOptions:\n{json.dumps(opts, indent=1)}",
@@ -170,9 +171,10 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
                     orig_n += 1
             out["conditions"]["SF"] = {
                 "aligned": ok, "executed": k, "alignment": ok / k if k else 0.0,
-                "questions": sum(1 for q in rs["questions"] if q["kind"] == "ambiguity"),
+                "questions": sum(1 for q in rs["questions"] if q["kind"] in ("ambiguity", "assumption")),
+                "assumptions": sum(1 for q in rs["questions"] if q["kind"] == "assumption"),
                 "likely_bugs": sum(1 for q in rs["questions"] if q["kind"] == "likely_bug"),
-                "question_texts": [q["text"] for q in rs["questions"] if q["kind"] == "ambiguity"],
+                "question_texts": [q["text"] for q in rs["questions"] if q["kind"] in ("ambiguity", "assumption")],
                 "behaviours": len([c for c in rs["clusters"] if c["kind"] == "behavior"]),
                 "fanout_executed": orig_n, "chosen_matches_reference": chosen_ok,
                 "agreement_before": res["agreement_before"], "clarified_spec": res["clarified_spec"],

@@ -46,14 +46,33 @@ For each axis of disagreement decide:
   plain-English clarifying question a non-programmer product owner can answer, a one-sentence "why"
   (the concrete consequence of picking wrong), and for each group an answer "label": a short
   human-readable sentence (max ~12 words, e.g. "The first people pay one extra cent each"), never an identifier.
-- kind "likely_bug": one group violates what the spec clearly says (e.g. crashes on a valid input,
-  wrong arithmetic). Then list the buggy groups in "bug_groups" and still give labels.
+- kind "likely_bug": ONLY when one group violates something the spec explicitly states (e.g. crashes on a
+  clearly valid input, wrong arithmetic). Behaviour the spec does not mention (invalid inputs, zero, empty,
+  rounding modes, ordering) is an "ambiguity", not a bug. List buggy groups in "bug_groups"; still give labels.
 If two axes are really the same underlying question, set "merge_into" on the later one to the earlier axis id.
 Also give a <=14-word plain-English summary of what each cluster does differently.
 Reply with JSON only:
 {"cluster_summaries": {"<cluster label>": str},
  "axes": [{"axis_id": str, "kind": "ambiguity"|"likely_bug", "question": str, "why": str,
            "options": [{"group": str, "label": str}], "bug_groups": [str], "merge_into": str|null}]}"""
+
+ASSUME_SYSTEM = """You are a meticulous requirements analyst. Many independent developers implemented the same
+spec and most of them converged on one behaviour, shown below as a representative implementation plus its
+ACTUAL executed outputs on probe inputs. Agreement does not mean the spec is clear: developers often share
+the same silent default (US date order, Python rounding, inclusive ranges, case handling, what zero means).
+
+List at most 3 SILENT ASSUMPTIONS: consequential decisions the spec never states, that this behaviour makes
+one particular way, where a reasonable product owner could want the opposite. Skip anything already covered
+by the open questions listed, anything the spec states explicitly, and trivia. For each give:
+- "question": one plain-English question for a non-programmer product owner
+- "why": one sentence on the concrete consequence
+- "consensus_label": short sentence describing what the implementations do (max ~12 words)
+- "alternative_label": short sentence describing the most plausible alternative (max ~12 words)
+- "input_ids": ids of probe inputs whose output would change under the alternative (may be empty)
+- "alternative_example": one example call and the output the alternative would give, e.g. "f('03/04/2025') -> '2025-04-03'"
+Return an empty list if nothing important is left implicit. Reply with JSON only:
+{"assumptions": [{"question": str, "why": str, "consensus_label": str, "alternative_label": str,
+                  "input_ids": [str], "alternative_example": str}]}"""
 
 CLARIFY_SYSTEM = """You rewrite a function spec so it is unambiguous, given the product owner's decisions.
 You also get the implementation whose behaviour the owner chose and executed examples of that behaviour
@@ -90,6 +109,16 @@ def explain_user(spec: str, sig: dict[str, Any], axes_payload: list[dict[str, An
         f"Spec:\n{spec.strip()}\n\nSignature:\n```python\n{signature_stub(sig)}\n```\n\n"
         f"Clusters (label, number of implementations, representative code):\n{json.dumps(clusters_payload, indent=1)}\n\n"
         f"Axes of disagreement:\n{json.dumps(axes_payload, indent=1)}"
+    )
+
+
+def assume_user(spec: str, sig: dict[str, Any], code: str, outputs: list[dict[str, Any]], n_agree: int, n_total: int,
+                open_questions: list[str]) -> str:
+    return (
+        f"Spec:\n{spec.strip()}\n\nSignature:\n```python\n{signature_stub(sig)}\n```\n\n"
+        f"{n_agree} of {n_total} implementations behave exactly like this one:\n```python\n{code[:2500]}\n```\n\n"
+        f"Its executed outputs (input id, arguments, output; 'raises' = exception):\n{json.dumps(outputs, indent=0)}\n\n"
+        f"Open questions already being asked:\n{json.dumps(open_questions, indent=1)}"
     )
 
 

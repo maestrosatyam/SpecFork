@@ -45,6 +45,9 @@ async def test_full_pipeline_offline(tmp_path):
     answers = {}
     for qq in amb:
         answers[qq["id"]] = next(o["id"] for o in qq["options"] if a_id in o["cluster_ids"])
+    for qq in run["questions"]:
+        if qq["kind"] == "assumption":
+            answers[qq["id"]] = qq["options"][0]["id"]  # keep the consensus behaviour
     await eng.resolve(run, answers)
     res = run["resolution"]
     assert run["status"] == "resolved"
@@ -129,3 +132,31 @@ def test_cluster_and_axes_logic():
     assert not exact and set(surv) == {"c1", "c2"}
     assert agreement(outcomes, {"i0": "1"}) == (3, 5)
     json.dumps(cr.clusters)
+
+
+async def test_silent_assumption_override_unlocks_cases():
+    eng, client = _engine()
+    run = new_run("t3", SPEC, 8)
+    await eng.run_all(run)
+    a = next(q for q in run["questions"] if q["kind"] == "assumption")
+    assert a["affected_input_ids"] == ["i3"]  # unknown ids dropped
+    keep, alt = a["options"]
+    assert keep["cluster_ids"] and alt["is_alternative"] and alt["cluster_ids"] == []
+    behaviours = [c for c in run["clusters"] if c["kind"] == "behavior"]
+    answers = {q["id"]: next(o["id"] for o in q["options"] if behaviours[0]["id"] in o["cluster_ids"])
+               for q in run["questions"] if q["kind"] == "ambiguity"}
+    answers[a["id"]] = alt["id"]
+    await eng.resolve(run, answers)
+    res = run["resolution"]
+    assert res["unlocked_input_ids"] == ["i3"]
+    assert all(c["input_id"] != "i3" for c in res["locked_cases"])
+    await client.aclose()
+
+
+def test_compatible_options_with_alternative():
+    from app.cluster import compatible_option_ids
+    clusters = [{"id": "c0", "kind": "behavior"}, {"id": "c1", "kind": "behavior"}]
+    qs = [{"id": "q0", "options": [{"id": "x", "cluster_ids": ["c0"]}, {"id": "y", "cluster_ids": ["c1"]}]},
+          {"id": "q1", "options": [{"id": "z", "cluster_ids": ["c1"]}, {"id": "w", "cluster_ids": [], "is_alternative": True}]}]
+    assert compatible_option_ids(qs, {"q0": "x"}, "q1", clusters) == ["w"]
+    assert compatible_option_ids(qs, {"q1": "w"}, "q0", clusters) == ["x", "y"]

@@ -58,7 +58,7 @@ def main() -> int:
         answers = {q["id"]: q["answer_option_id"] for q in run["questions"]
                    if q["kind"] == "likely_bug" and q.get("answer_option_id")}
         for q in run["questions"]:
-            if q["kind"] != "ambiguity":
+            if q["kind"] not in ("ambiguity", "assumption"):
                 continue
             ok = set(compatible_option_ids(run["questions"], answers, q["id"], run["clusters"]))
             cands = [o for o in q["options"] if o["id"] in ok] or q["options"]
