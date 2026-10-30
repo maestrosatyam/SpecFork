@@ -92,8 +92,8 @@ async def test_security_headers_and_no_docs(api):
     r = await api.get("/api/health")
     assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
     assert r.headers["x-content-type-options"] == "nosniff"
-    assert (await api.get("/docs")).status_code in (404, 200) and "swagger" not in (await api.get("/docs")).text.lower()
-    assert (await api.get("/openapi.json")).headers.get("content-type", "").startswith("application/json") is False
+    assert "swagger" not in (await api.get("/docs")).text.lower()
+    assert '"openapi"' not in (await api.get("/openapi.json")).text
 
 
 async def test_runs_listing_is_private(api):
