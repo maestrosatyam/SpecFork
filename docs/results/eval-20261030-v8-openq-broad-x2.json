@@ -1,0 +1,3509 @@
+{
+ "meta": {
+  "timestamp": "20261030-202322",
+  "n": 12,
+  "repeats": 2,
+  "assumption_min_confidence": 0.0,
+  "max_assumptions": 3,
+  "assumption_requires_witness": false,
+  "implementers": [
+   "nvidia/Nemotron-3_5-Lightning"
+  ],
+  "open_questions": true,
+  "fast_model": "nvidia/Nemotron-3_5-Lightning",
+  "deep_model": "nvidia/Nemotron-3-Ultra-550b-a55b",
+  "prompt_version": "2026-10-30.2",
+  "wall_s": 1179.6,
+  "items": 32
+ },
+ "results": [
+  {
+   "id": "bill_split",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.000505,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 5,
+     "executed": 12,
+     "alignment": 0.4166666666666667,
+     "questions": 5,
+     "question_texts": [
+      "What should the function do when n is zero or negative? (e.g., raise an error, return an empty list, or use a default behavior?)",
+      "How should rounding be handled when total / n in cents doesn't divide evenly across all n people, and the sum of individually rounded shares would differ from the total? (e.g., should the remainder be distributed cent-by-cent to make the sum match the total?)",
+      "Should the function validate inputs (e.g., negative total, non-integer n) and what error should it raise if inputs are invalid?",
+      "Which rounding mode should be used: Python's default banker's rounding (round half to even) or standard mathematical half-up rounding to the nearest cent?",
+      "Is the total parameter expected to always be a non-negative value, or should the function gracefully handle negative totals and non-numeric inputs?"
+     ],
+     "clarified_spec": "Split a restaurant bill evenly between n people and return how much each person pays, in dollars rounded to the cent. Raise ValueError if n <= 0 or total is negative; raise TypeError for non-numeric inputs. Use standard mathematical half-up rounding to the nearest cent. Distribute leftover cents one each to the first people in the list so the sum matches the total. Example: total=10.00, n=3 yields [3.34, 3.33, 3.33]. Example: total=10.01, n=3 yields [3.34, 3.34, 3.33].",
+     "cost_usd": 0.0027522,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 8,
+     "executed": 12,
+     "alignment": 0.6666666666666666,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When a per\u2011person share is exactly halfway between two cents (e.g., $49.995), should it round up to the higher cent or to the nearest even cent?",
+      "Should the individual amounts be adjusted so that their sum exactly equals the original bill total?",
+      "Should the function reject non\u2011positive numbers of people (zero or negative) instead of returning an empty list or raising a division error?",
+      "Should a negative bill total be considered invalid and cause an error rather than producing negative per\u2011person amounts?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.8333,
+     "clarified_spec": "Split a restaurant bill evenly between n people and return how much each person pays, in dollars rounded to the cent. Halves round to the nearest even cent (banker's rounding). The per\u2011person amounts are adjusted so their sum exactly equals the original total by distributing the rounding remainder to the first few people. A ValueError is raised for any n \u2264 0. A ValueError is raised when total < 0. A TypeError is raised for non\u2011numeric total or n. The rounding difference is redistributed using the largest\u2011remainder method so shares sum exactly to the total. A total of $0.00 is valid and returns $0.00 per person.",
+     "cost_usd": 0.0231215,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 89.3
+  },
+  {
+   "id": "round_temperature",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0002877,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 9,
+     "executed": 12,
+     "alignment": 0.75,
+     "questions": 4,
+     "question_texts": [
+      "For temperature values exactly halfway between two whole degrees (e.g., 21.5), should the function round half up toward positive infinity, use banker's rounding to the nearest even integer, or follow another convention? How should -1.5 be handled?",
+      "Should the function gracefully handle non-finite inputs such as NaN or infinity, and what should the behavior be?",
+      "Are there domain-specific input validation or clamping rules (e.g., physical temperature bounds) that should influence rounding?",
+      "Is the rounding intended as standard arithmetic round-half-up for dashboard display, or does it need to adhere to a specific metrological standard?"
+     ],
+     "clarified_spec": "Round a temperature reading in degrees Celsius to the nearest whole degree for the dashboard display. Values exactly halfway between two whole degrees round away from zero symmetrically: 21.5 becomes 22 and -1.5 becomes -2. This follows standard arithmetic round-half-away-from-zero as taught in school.",
+     "cost_usd": 0.0017689,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 3,
+     "executed": 12,
+     "alignment": 0.25,
+     "questions": 1,
+     "assumptions": 0,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When a temperature is exactly halfway between two whole degrees (e.g., 2.5\u00b0C or -3.5\u00b0C), which rounding rule should apply?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0,
+     "clarified_spec": "Round a temperature reading in degrees Celsius to the nearest whole degree for the dashboard display. Values exactly halfway between integers round upward toward +\u221e. Non\u2011numeric inputs raise TypeError. NaN or infinite values raise TypeError. Example: 2.5 \u2192 3; -3.5 \u2192 -3.",
+     "cost_usd": 0.0129694,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 55.2
+  },
+  {
+   "id": "email_dedupe",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004037,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "Should the output preserve the original case of the first occurrence of each email, or should all returned addresses be normalized to lowercase?",
+      "Should leading/trailing whitespace be stripped from email addresses before comparing for duplicates?",
+      "Is the input list guaranteed to contain only non-empty strings, or should the function handle empty strings, None, or non-string values gracefully?",
+      "Must the output maintain the original signup order of first occurrences, or can duplicates be removed in any order?"
+     ],
+     "clarified_spec": "Remove duplicate email addresses from a newsletter signup list. Addresses that differ only in capitalization count as duplicates. Preserve the original case of the first occurrence. Strip leading and trailing whitespace before comparing. Skip empty strings and non-string values. Maintain the original signup order of first occurrences.",
+     "cost_usd": 0.0021163,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 11,
+     "alignment": 0.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should leading or trailing whitespace around an email address be ignored when checking for duplicates?",
+      "Should the function reject values that are not syntactically valid email addresses?",
+      "Should empty strings be considered valid email addresses and kept in the list?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Remove duplicate email addresses from a newsletter signup list. Addresses that differ only in capitalization count as duplicates. Leading and trailing whitespace is ignored when detecting duplicates. No syntactic validation of email addresses is performed; any string is accepted. Empty strings are retained as\u2011is, keeping only the first occurrence. When case\u2011insensitive duplicates are removed, the first occurrence\u2019s original casing is preserved. Non\u2011string elements in the input are skipped. The returned list contains the original strings unchanged, not stripped versions.",
+     "cost_usd": 0.0112633,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 52.2
+  },
+  {
+   "id": "business_days",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 4,
+     "executed": 12,
+     "alignment": 0.3333333333333333,
+     "questions": 0,
+     "cost_usd": 0.001025,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 10,
+     "executed": 11,
+     "alignment": 0.9090909090909091,
+     "questions": 4,
+     "question_texts": [
+      "Should the start and end dates be included in the count when they fall on a business day (i.e., is the range inclusive, exclusive, or half-open)?",
+      "If the start date is after the end date, should the function return 0, a negative count, or treat the dates as swapped?",
+      "Is the weekend strictly Saturday and Sunday, or could 'weekends' include other days (e.g., Friday\u2013Saturday)?",
+      "If start equals end and is a weekday, should the result be 0 or 1?"
+     ],
+     "clarified_spec": "Count the number of business days between two dates (given as 'YYYY-MM-DD'). Weekends don't count; ignore public holidays. The range is inclusive of both start and end dates when they fall on business days. If the start date is after the end date, the dates are treated as swapped. Weekends are strictly Saturday and Sunday. If start equals end and is a weekday, the result is 1.",
+     "cost_usd": 0.0026836,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 9,
+     "executed": 11,
+     "alignment": 0.8181818181818182,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function swap dates when start is after end, or return zero?",
+      "Are the start and end dates both included in the count?",
+      "Which two days of the week are treated as weekends?",
+      "Is the work week defined as Monday\u2011Friday (five business days) or could it be a different pattern such as Sunday\u2011Thursday?",
+      "Should the function validate that the input strings are well\u2011formed ISO dates and raise an error on bad input?"
+     ],
+     "behaviours": 4,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.4167,
+     "clarified_spec": "Count the number of business days between two dates (given as 'YYYY-MM-DD'). Weekends don't count; ignore public holidays. If start > end, swap dates and include both endpoints. Both start and end dates are counted. Weekends are Saturday (weekday 5) and Sunday (weekday 6). Business days run Monday through Friday. Inputs are assumed valid ISO dates; no validation. If start == end, return 1 for weekday else 0. The interval is inclusive on both ends. Weekend dates inside the range are skipped without shifting. E.g., 2024-01-01 to 2024-01-01 \u2192 1; 2024-02-29 to 2023-02-28 \u2192 263.",
+     "cost_usd": 0.0284176,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 86.9
+  },
+  {
+   "id": "slugify",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0006024,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "Should the slug be converted to lowercase?",
+      "What separator should be used between words (e.g., hyphen `-`, underscore `_`, or other)?",
+      "How should non-ASCII characters (e.g., accents, unicode) be handled to ensure URL safety?",
+      "Should multiple consecutive separators or spaces be collapsed into a single separator, or stripped entirely?",
+      "What should be returned if the title is empty or results in an empty slug after processing?"
+     ],
+     "clarified_spec": "Turn a blog post title into a URL slug. The slug is converted to lowercase.",
+     "cost_usd": 0.001351,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 10,
+     "alignment": 0.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should characters with diacritics (e.g., caf\u00e9) be stripped to plain ASCII (cafe) or kept as\u2011is in the slug?",
+      "Should underscores in the title become hyphens, be removed, or stay as underscores?",
+      "Should consecutive spaces/hyphens be collapsed to a single hyphen and leading/trailing hyphens stripped?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Turn a blog post title into a URL slug. NFKD\u2011normalize the title and drop any non\u2011ASCII characters. Keep underscores unchanged. Collapse consecutive spaces or hyphens to a single hyphen and strip leading or trailing hyphens. Return an empty string for empty or None titles. Convert the result to lowercase. Examples: slugify('A-b_c d') \u2192 'a-b_c-d'; slugify('  padded  ') \u2192 'padded'.",
+     "cost_usd": 0.0109313,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 39.0
+  },
+  {
+   "id": "median",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 11,
+     "executed": 11,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0004626,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 11,
+     "executed": 11,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "What should the function return when the input list is empty? (e.g., `None`, `0.0`, or raise an error?)",
+      "For an even-length list, should the median be computed as the average of the two middle values, or should it pick one of them (e.g., the lower middle)?",
+      "How should non-numeric or `None` values within the input list be handled\u2014should they raise an error, be skipped, or cause the function to return `None`?",
+      "Should the function strictly enforce `list[float]` types, or should it gracefully accept `list[int]` and other numeric types?"
+     ],
+     "clarified_spec": "Return the median of a list of response times (in milliseconds) for the latency dashboard. Return None if the input list is empty. For an even-length list, compute the median as the average of the two middle values. Skip non-numeric values in the input list. Gracefully accept int and float values.",
+     "cost_usd": 0.0019741,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 7,
+     "alignment": 0.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "What should the function return when the input list is empty?",
+      "For an even\u2011sized list, should the median be the arithmetic mean of the two central values, or the lower (or upper) central value?",
+      "How should non\u2011finite numbers (NaN, +inf, -inf) be treated if they appear in the list?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 11,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return the median of a list of response times (in milliseconds) for the latency dashboard. If the input list is empty, the function returns None. For an even\u2011sized list, the median is the arithmetic mean of the two central values. Non\u2011finite numbers (NaN, +inf, -inf) are filtered out before computing the median. The function accepts int and float values; any non\u2011numeric type raises a TypeError. Zero and positive values are valid; negative values are rejected as invalid. The returned median is the exact float value without rounding.",
+     "cost_usd": 0.0117139,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 53.7
+  },
+  {
+   "id": "age_on_date",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005564,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 7,
+     "executed": 11,
+     "alignment": 0.6363636363636364,
+     "questions": 5,
+     "question_texts": [
+      "If `on` is before `birthdate`, should the function return 0, raise a ValueError, or return a negative integer?",
+      "How should February 29 birthdays be treated when computing age on a non-leap-year date (e.g., should the birthday be considered Feb 28 or Mar 1)?",
+      "Should the function validate that both inputs are valid 'YYYY-MM-DD' strings, and what exception should be raised for malformed or invalid dates?",
+      "Is there a specific cultural or institutional convention for 'whole years' that differs from the standard algorithm of comparing month/day after the birth date?",
+      "Should the function tolerate leading/trailing whitespace or minor format variations in the input strings, or strictly require exact 'YYYY-MM-DD' format?"
+     ],
+     "clarified_spec": "Calculate a person's age in whole years as of a given date. Both dates are 'YYYY-MM-DD' strings. If `on` is before `birthdate`, raise ValueError. For February 29 birthdays in non-leap years, the birthday advances to March 1; on February 28 the person is still the previous age. Validate inputs and raise ValueError for malformed or invalid dates. Strictly require exact 'YYYY-MM-DD' format. Example: birthdate='2000-02-29', on='2001-02-28' returns 0. Example: birthdate='2000-02-29', on='2001-03-01' returns 1.",
+     "cost_usd": 0.0033079,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 3,
+     "executed": 11,
+     "alignment": 0.2727272727272727,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "Should a person born on February\u202f29 be considered to have their birthday on February\u202f28 in non\u2011leap years, or should the birthday be treated as not occurring until March\u202f1?",
+      "Should the function return a negative age when the reference date is before the birthdate, or should it raise an error / clamp to zero?",
+      "Should invalid or non\u2011ISO date strings cause an exception, or should the function handle them gracefully (e.g., return None or 0)?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.9167,
+     "clarified_spec": "Calculate a person's age in whole years as of a given date. Both dates are 'YYYY-MM-DD' strings. A birthdate of February 29 counts as a birthday on March 1 in non\u2011leap years. If the reference date is before the birthdate, the function raises a ValueError. Any non\u2011ISO date string causes a parsing exception. The function strictly requires the YYYY\u2011MM\u2011DD format with zero\u2011padded month and day. All dates valid in Python's datetime module (years 1\u20119999) are supported. When the reference date equals the birthdate, the function returns 0. age_on(birthdate='2000-02-29', on='2004-02-28') -> 3. age_on(birthdate='abcd', on='2000-01-01') -> raises",
+     "cost_usd": 0.0221106,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 75.2
+  },
+  {
+   "id": "parse_slash_date",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004451,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 3,
+     "question_texts": [
+      "Should the function assume a month-day-year (MM/DD/YYYY) or day-month-year (DD/MM/YYYY) format for dates like '03/04/2025'?",
+      "If both the day and month are \u2264 12 (as in '03/04/2025'), what rule should the function use to disambiguate the order (e.g., always month-first, or validate against a valid date range)?",
+      "Are there other date format variations in the CSV (e.g., single-digit days/months, different separators, or alternative orders) that the function must also handle alongside the '03/04/2025' style?"
+     ],
+     "clarified_spec": "Parse the date column from our supplier's CSV export (values look like '03/04/2025') and return it as an ISO 'YYYY-MM-DD' string. Interpret ambiguous dates as DD/MM/YYYY per German supplier format. Validate against a valid calendar date; if ambiguous, prefer DD/MM/YYYY as the German format. Handle single-digit days/months and optional whitespace; other formats are not required.",
+     "cost_usd": 0.0025285,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 9,
+     "executed": 12,
+     "alignment": 0.75,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should single\u2011digit month and day be zero\u2011padded in the ISO output, and is the input order month/day or day/month?",
+      "How should the parser handle dates that don't match the expected 'MM/DD/YYYY' format, such as two\u2011digit years, year\u2011first ordering, or trailing spaces?",
+      "Should the parser reject dates with impossible month or day numbers (e.g., month 13, day 00, day 32)?",
+      "Should leading/trailing whitespace and newlines be stripped before parsing the date?",
+      "Should a time component after the date (e.g., '03/04/2025 12:30:00') be ignored or cause an error?"
+     ],
+     "behaviours": 4,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Parse the date column from our supplier's CSV export (values look like '03/04/2025') and return it as an ISO 'YYYY-MM-DD' string. Input uses day/month/year order with zero\u2011padded day and month. Two\u2011digit years are accepted and zero\u2011padded to four digits. Out\u2011of\u2011range month or day values raise ValueError. Leading and trailing whitespace is stripped before parsing. Any trailing time component is ignored. Non\u2011string, None, or empty inputs raise ValueError. February 29 is accepted only in leap years; otherwise raises ValueError. Output is always exactly ten characters YYYY\u2011MM\u2011DD with a four\u2011digit year (1000\u20119999). Examples: '3/4/2025' \u2192 '2025-04-03'; '03/04/25' \u2192 '25-04-03'.",
+     "cost_usd": 0.0273542,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 67.2
+  },
+  {
+   "id": "word_count",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.000263,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "{'question': \"Should hyphenated compounds (e.g., 'well-known') be counted as one word or multiple words?\"}",
+      "{'question': 'Should contractions and apostrophes (e.g., \"don\\'t\", \"students\\'\") be treated as part of a word or as separate tokens?'}",
+      "{'question': 'How should multiple consecutive whitespaces, tabs, or newlines be normalized when splitting the text?'}",
+      "{'question': 'What should the function return for empty strings or inputs containing only whitespace?'}",
+      "{'question': 'Should standalone URLs, email addresses, or numbers be counted as words, ignored, or handled specially?'}"
+     ],
+     "clarified_spec": "Count the number of words in a student's essay so we can enforce the word limit. Hyphenated compounds count as one word. Contractions and apostrophes are part of a word. Multiple consecutive whitespaces, tabs, or newlines are normalized to a single space before splitting. Empty strings or whitespace-only inputs return 0. Numbers count as words; URLs and emails are not special.",
+     "cost_usd": 0.0018387,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should hyphens and underscores split words?",
+      "Should punctuation marks that sit directly next to a word (e.g., \"Hello!How\") be treated as word separators?",
+      "Should a non\u2011breaking space (U+00A0) be considered a word separator?",
+      "Should the zero\u2011width space character (U+200B) be treated as a word separator?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Count the number of words in a student's essay so we can enforce the word limit. Hyphens and underscores are part of words. Punctuation directly adjacent to a word acts as a delimiter. Non\u2011breaking space (U+00A0) splits words like whitespace. Zero\u2011width space (U+200B) splits words like whitespace. Empty or whitespace\u2011only input returns 0. Consecutive whitespace characters count as a single separator. Numeric sequences are counted as words. Examples: Hello-world \u2192 1; Hello!How \u2192 2.",
+     "cost_usd": 0.0197315,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 50.2
+  },
+  {
+   "id": "truncate_preview",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 11,
+     "executed": 12,
+     "alignment": 0.9166666666666666,
+     "questions": 0,
+     "cost_usd": 0.0003906,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "Does max_len include the 3-character '...' suffix in the total length limit, or is it the maximum length of the text portion before truncation?",
+      "When the input text is already at or below max_len characters, should the function return it unchanged or always append '...'?",
+      "If truncation would leave fewer than 3 characters for the text before '...' (e.g., max_len = 4), how should the function prioritize fitting the suffix versus preserving text?",
+      "Should the truncation cut at exact character boundaries (potentially mid-word), or should it prefer word-boundary cuts?"
+     ],
+     "clarified_spec": "Truncate a product description to max_len characters for the listing card, adding '...' when it gets cut off. max_len is the total length of the result including the '...' suffix. Return the input unchanged when it is at or below max_len characters. The result must be exactly max_len characters long, so the '...' suffix takes priority over preserving text. Cut at the exact character position even if that splits a word. Example: 'Hello world' with max_len=8 yields 'Hello...'. Example: 'Hi' with max_len=4 yields 'H...'.",
+     "cost_usd": 0.0021499,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 10,
+     "executed": 12,
+     "alignment": 0.8333333333333334,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When max_len is less than 4, should the function still add '...' or just return as many characters as fit?",
+      "Should the truncation stop at the last whole word that fits, rather than cutting in the middle of a word?",
+      "Should leading and trailing whitespace be trimmed before applying the length limit?",
+      "Should the length limit count user\u2011perceived characters (grapheme clusters) instead of Unicode code points?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.25,
+     "clarified_spec": "Truncate a product description to max_len characters for the listing card, adding '...' when it gets cut off. If max_len < 4, return the first max_len characters without ellipsis. Truncation cuts at the exact character limit (max_len\u20113) regardless of word boundaries. All original whitespace is kept and counted toward max_len. Length is measured in Unicode code points (len). The '...' suffix counts toward the max_len limit. Non\u2011string input raises TypeError. When text has no whitespace and must be truncated, cut at max_len\u20113 to accommodate the suffix. Example: truncate('', -1) \u2192 '' ; truncate('Once upon a time in a land far far away', 20) \u2192 'Once upon a time ...'.",
+     "cost_usd": 0.0172777,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 64.5
+  },
+  {
+   "id": "percent_change",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 10,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004216,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "When `old` is 0, should the function return `None`, raise a `ValueError`, or return `float('inf')`?",
+      "How should negative `old` values be handled: use the standard formula `((new - old) / old) * 100`, or apply a different convention (e.g., only compute for positive old, or treat as invalid)?",
+      "What behavior is expected for non-finite inputs (`NaN`, `Infinity`)? Should the function return `None`, propagate the value, or validate and reject them?",
+      "Should rounding follow Python's default `round()` (banker's rounding to nearest even) or a 'round half away from zero' mode to match typical dashboard expectations?",
+      "What should the return value be when both `old` and `new` are 0? (e.g., `0.0`, `None`, or an error?)"
+     ],
+     "clarified_spec": "Calculate the percentage change from last month's value to this month's value for the KPI dashboard, rounded to one decimal place. Return None when old is 0 and new is non-zero; return 0.0 when both are 0. Use the standard formula with absolute value in denominator: (new - old) / |old| * 100. Return None for any non-finite input (NaN or Infinity). Use Python's default round() function. Example: old=0, new=10 returns None. Example: old=-50, new=-25 returns 50.0.",
+     "cost_usd": 0.0027944,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 9,
+     "executed": 9,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 2,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "How should percentage change be calculated when the prior value is negative?",
+      "When the prior month's value is zero, should the function return a special value (e.g., None) or raise an error / return infinity?",
+      "When the percentage change rounds to a tie (e.g., 0.05%), should the rounding follow banker's rounding (ties to even) or round\u2011half\u2011up?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Calculate the percentage change from last month's value to this month's value for the KPI dashboard, rounded to one decimal place. If the prior value is negative, use its absolute value as the denominator. If the prior value is exactly zero, return None unless the new value is also zero, in which case return 0.0. Rounding follows Python's round (banker's rounding, ties to even). Any non\u2011numeric input (None, strings, NaN, infinities) yields None. Only an exact zero prior value triggers the special case; any non\u2011zero prior value, no matter how small, is used normally. Example: percent_change(old=-100, new=-50) \u2192 50; percent_change(old=0, new=50) \u2192 None.",
+     "cost_usd": 0.0218686,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 83.0
+  },
+  {
+   "id": "merge_intervals",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0006542,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "If two intervals touch at an endpoint (e.g., [1, 2] and [2, 3]), should they be merged into a single block?",
+      "What should the function return when the input list is empty?",
+      "Should intervals where start == end (zero-duration) be kept in the output, filtered out, or treated as an error?",
+      "Is the output required to be sorted by start time, or is the order unspecified?",
+      "How should malformed intervals (e.g., start > end, non-integer values, or None) be handled?"
+     ],
+     "clarified_spec": "Merge overlapping meeting time ranges into busy blocks. Each range is [start, end] in minutes since midnight. Intervals that touch at an endpoint are merged into a single block. An empty input list returns an empty list. Zero-duration intervals where start equals end are kept in the output. The output is sorted by start time.",
+     "cost_usd": 0.0020118,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "assumptions": 0,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [],
+     "behaviours": 0,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Merge overlapping meeting time ranges into busy blocks. Each range is [start, end] in minutes since midnight. Intervals that touch at an endpoint are merged into a single block. The resulting blocks are always sorted by start time. [1,2] and [2,3] \u2192 [1,3]. input [[5,6],[1,2]] \u2192 output [[1,2],[5,6]]",
+     "cost_usd": 0.0048316,
+     "calls": 29,
+     "rejected": 0
+    }
+   },
+   "wall_s": 38.3
+  },
+  {
+   "id": "top_k_ties",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 9,
+     "executed": 12,
+     "alignment": 0.75,
+     "questions": 0,
+     "cost_usd": 0.0004675,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "If multiple players have the same score, what tie-breaking order should be used (e.g., alphabetical, input order, or unspecified)?",
+      "If k is greater than the number of players in the dictionary, should the function return all players sorted by score, or behave differently?",
+      "If k is 0 or negative, should the function return an empty list, or raise an error/validation?",
+      "How should an empty `scores` dictionary be handled? Should it return an empty list regardless of k?"
+     ],
+     "clarified_spec": "Return the names of the top k players on the leaderboard, highest score first. Ties are broken alphabetically by name. If k exceeds the number of players, return all players sorted by score descending. If k is zero or negative, return an empty list. An empty scores dictionary returns an empty list regardless of k.",
+     "cost_usd": 0.0016788,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 11,
+     "executed": 12,
+     "alignment": 0.9166666666666666,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When multiple players share the same score, how should the leaderboard order them?",
+      "When players have the same score, should the leaderboard order them alphabetically in a case\u2011sensitive way (e.g., 'Bob' before 'alice') or case\u2011insensitively / by some other rule?",
+      "If a negative value is passed for k, should the function treat it like a Python slice (returning all but the last |k| players) or treat it as an invalid request (e.g., return an empty list or raise an error)?",
+      "When k exceeds the number of players, should the function simply return all players, or should it signal an error / pad the result?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.9167,
+     "clarified_spec": "Return the names of the top k players on the leaderboard, highest score first. Ties are broken by case\u2011sensitive alphabetical order. Negative k is treated as zero, yielding an empty list. If k exceeds the number of players, all players are returned. k = 0 returns an empty list. An empty scores dict returns an empty list. When k limits the result, exactly k players are returned even if ties exist at the cutoff. Example: top_k_players({'alice':50,'Bob':50},1) -> ['Bob']; top_k_players({'Alice':100,'Bob':90,'Charlie':80},5) -> ['Alice','Bob','Charlie'].",
+     "cost_usd": 0.0160394,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 49.3
+  },
+  {
+   "id": "password_strength",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 8,
+     "executed": 12,
+     "alignment": 0.6666666666666666,
+     "questions": 0,
+     "cost_usd": 0.0006541,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "What defines 'weak' and 'medium' passwords? (Currently only 'strong' criteria are specified.)",
+      "Which character set qualifies as 'symbols' for the strength check (e.g., ASCII punctuation, Unicode, specific symbols)?",
+      "Is there a minimum length requirement for 'medium' classification, or is it based solely on character variety?",
+      "Must all four character categories (uppercase, lowercase, digits, symbols) be present for 'strong', or can subsets qualify for 'medium'?",
+      "How should the function handle non-string or empty input values?"
+     ],
+     "clarified_spec": "Classify a password as 'weak', 'medium', or 'strong'. A strong password is at least 12 characters long and contains uppercase letters, lowercase letters, digits, and symbols. A symbol is any character that is not a letter or digit; spaces count as symbols. A medium password is not strong, has length at least 8, and contains characters from at least three of the four classes. A weak password is everything else.",
+     "cost_usd": 0.0024178,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 2,
+     "assumptions": 1,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Which characters count as symbols, and what length/class rules define a medium password?",
+      "Should spaces and other whitespace characters be treated as symbols?"
+     ],
+     "behaviours": 5,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.5833,
+     "clarified_spec": "Classify a password as 'weak', 'medium', or 'strong'. A strong password is at least 12 characters long and contains uppercase letters, lowercase letters, digits, and symbols. Spaces and any whitespace characters count as symbols. A medium password has length at least 8 and contains characters from at least three of the four classes (uppercase, lowercase, digit, symbol). Non\u2011string inputs and empty strings are classified as 'weak'. Non\u2011ASCII letters are treated as uppercase or lowercase according to their case; all other non\u2011ASCII characters count as symbols. Leading and trailing whitespace are not stripped; internal whitespace remains a symbol. Example: \"Hello World\" \u2192 medium. Example: \"\u00c9COLE caf\u00e9\" \u2192 medium.",
+     "cost_usd": 0.0274741,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 88.9
+  },
+  {
+   "id": "title_case",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0010172,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 1,
+     "executed": 10,
+     "alignment": 0.1,
+     "questions": 5,
+     "question_texts": [
+      "For minor connecting words (e.g., 'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'from'), should they be lowercased unless they are the first or last word of the headline?",
+      "How should hyphenated compounds be capitalized? (e.g., 'well-known': 'Well-Known', 'well-Known', or 'Well-known'?)",
+      "Should acronyms and initialisms (e.g., 'API', 'HTML', 'URL') be preserved in their original form, or forced to title case?",
+      "Should the function normalize the input case first (e.g., convert to lowercase before processing), or respect the existing casing of words?",
+      "Are there any words, phrases, or patterns that should always be excluded from title casing or treated as exceptions (e.g., brand names, 'iOS', 'e-commerce')?"
+     ],
+     "clarified_spec": "Convert a blog headline to title case. Lowercase minor connecting words unless they are the first or last word. Capitalize the first letter after each hyphen. Preserve acronyms and initialisms in their original form. Normalize the input to lowercase first, then apply title casing rules.",
+     "cost_usd": 0.0039614,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 4,
+     "executed": 12,
+     "alignment": 0.3333333333333333,
+     "questions": 7,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the final word be capitalized even if it is a small word?",
+      "Which words count as small (articles, conjunctions, prepositions) and stay lowercase?",
+      "Should a small word that appears in all caps stay uppercase?",
+      "Should original spacing (multiple, leading, trailing spaces) be preserved?",
+      "Should words that are entirely uppercase (e.g., acronyms) remain uppercase?",
+      "Should hyphenated or underscore\u2011joined compounds be split into separate words for title\u2011casing?",
+      "Should the first word always be capitalized even when it is a \u201csmall\u201d word such as \u201ca\u201d or \"the\"?"
+     ],
+     "behaviours": 7,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Convert a blog headline to title case. The last word is always capitalized. Only classic short words stay lowercase. Small words are lowercased regardless of case. All whitespace collapses to single spaces. Fully uppercase words remain unchanged. Hyphenated or underscored compounds stay intact. The first word follows the small\u2011word rule. Empty input returns an empty string. Only alphabetic characters are capitalized. Words with digits keep only first letter capitalized. Example: \"to be or not to be\" \u2192 \"To Be or Not to Be\"; \"hello   world\" \u2192 \"Hello World\".",
+     "cost_usd": 0.0338281,
+     "calls": 36,
+     "rejected": 0
+    }
+   },
+   "wall_s": 93.9
+  },
+  {
+   "id": "page_count",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004062,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Given the total number of search results and the page size, return how many pages the paginator should show.",
+     "cost_usd": 0.0009413,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "assumptions": 2,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should a negative page size be considered invalid (raise an error) or treated as zero pages?",
+      "Should a page size of zero be considered invalid (raise an error) or treated as zero pages?",
+      "Should a negative total_items value be treated as zero pages or cause an error?",
+      "When there are zero results, should the paginator show zero pages or one empty page?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.5833,
+     "clarified_spec": "Given the total number of search results and the page size, return how many pages the paginator should show. A negative page_size raises an error. A page_size of zero raises an error. A negative total_items raises ValueError. Zero total_items returns 1 page. Non\u2011integer inputs raise TypeError. A page_size exceeding the permitted maximum raises TypeError. Examples: page_count(2, -1) raises; page_count(100, 0) raises.",
+     "cost_usd": 0.0153514,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 57.5
+  },
+  {
+   "id": "normalize_phone",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0008743,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 1,
+     "executed": 12,
+     "alignment": 0.08333333333333333,
+     "questions": 5,
+     "question_texts": [
+      "What output format should the normalized number use? (e.g., E.164 with country code '+11234567890', plain 10-digit string '1234567890', or a specific local pattern like '(123) 456-7890')",
+      "Should a leading '1' be treated as the US country code and stripped to produce a 10-digit number, or kept as part of the normalized string?",
+      "How should extensions (e.g., 'x123', 'ext. 456') be handled \u2014 dropped entirely, appended to the number, or returned separately?",
+      "What error handling behavior is expected for invalid or non-US inputs \u2014 raise a ValueError, return an empty string, or silently normalize whatever digits are present?",
+      "Should all non-digit characters be stripped during processing, or should specific formatting characters (like '+' or parentheses) be preserved in the output per the chosen format?"
+     ],
+     "clarified_spec": "Normalize the US phone numbers people type into the signup form so we store them in one consistent format. All non-digit characters are stripped during processing; the output format is determined by the E.164 rule regardless of input formatting.",
+     "cost_usd": 0.0017337,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 9,
+     "alignment": 0.0,
+     "questions": 6,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "How should the function handle inputs that contain no recognizable phone number?",
+      "How should the function handle inputs that are not exactly 10\u2011digit US numbers (e.g., missing area code or contain extensions)?",
+      "Should a leading '+1' country code be stripped and which output format (parentheses or dashes) should be used?",
+      "Should alphabetic characters that map to telephone keypad letters (e.g., \"FLOWERS\" \u2192 3569377) be converted to digits before normalization?",
+      "If a user pastes text containing more than one phone number, should the function extract and normalize the first valid US number?",
+      "Should the function accept and strip non\u2011US country codes (e.g., +44, +61) before applying US formatting?"
+     ],
+     "behaviours": 9,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Normalize the US phone numbers people type into the signup form so we store them in one consistent format. Raise an exception if no recognizable phone number is found. Raise an exception for inputs not exactly a 10\u2011digit US number. Strip leading '+1' and format as (XXX) XXX-XXXX. Strip alphabetic characters; do not translate them to digits. Scan for the first 10\u2011digit US pattern and normalize only that part. Only US country code '1' is recognized and stripped; others raise an exception. Raise ValueError if input is empty or only non\u2011digit characters. Return a 10\u2011digit number without separators unchanged. Raise ValueError if non\u2011digit characters remain after stripping formatting.",
+     "cost_usd": 0.0397366,
+     "calls": 36,
+     "rejected": 0
+    }
+   },
+   "wall_s": 115.7
+  },
+  {
+   "id": "letter_grade",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004704,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Convert a student's percentage score to a letter grade: A for 90 and above, B for the 80s, C for the 70s, D for the 60s, and F below 60.",
+     "cost_usd": 0.001429,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 2,
+     "assumptions": 2,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should a negative percentage score be considered a valid input that simply yields an 'F', or should it raise an error?",
+      "Should scores above 100 be accepted and graded as 'A', or should they be capped at 100 (or rejected) before grading?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Convert a student's percentage score to a letter grade: A for 90 and above, B for the 80s, C for the 70s, D for the 60s, and F below 60. Negative percentages raise a ValueError. Any score \u2265 90, even above 100, yields 'A'. Non\u2011numeric inputs raise a TypeError. NaN and infinities raise a ValueError. Boundary scores (90, 80, 70, 60) map to the higher grade (inclusive lower bound). letter_grade(-3.5) raises ValueError. letter_grade(95) returns 'A'.",
+     "cost_usd": 0.0126734,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 54.8
+  },
+  {
+   "id": "shipping_cost",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004969,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "Does 'under 1 kg' mean weight strictly less than 1 kg (weight < 1), or less than or equal to 1 kg (weight <= 1)?",
+      "Does 'between 1 and 5 kg' include the endpoints 1 kg and 5 kg, and which bracket does the exact boundary fall into?",
+      "Does 'Orders over $50 ship free' mean order_total > 50 or order_total >= 50?",
+      "Should the function assume valid non-negative inputs, or specify behavior for edge cases like negative weight or order total?"
+     ],
+     "clarified_spec": "Calculate the shipping cost: packages under 1 kg cost $5, packages between 1 and 5 kg cost $10, and heavier packages cost $20. Orders over $50 ship free. Weight strictly less than 1 kg falls in the $5 bracket. Weight from 1 kg up to and including 5 kg falls in the $10 bracket. Free shipping applies only when order total exceeds $50. Non-positive weight raises ValueError.",
+     "cost_usd": 0.0023333,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should an order total of exactly $50 qualify for free shipping?",
+      "Should a package that weighs exactly 1\u202fkg be charged the $5 rate or the $10 rate?",
+      "Should a package that weighs exactly 5\u202fkg be charged the $10 rate or the $20 rate?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Calculate the shipping cost: packages under 1 kg cost $5, packages between 1 and 5 kg cost $10, and heavier packages cost $20. Orders over $50 ship free. Free shipping applies only when the order total exceeds $50. A package weighing exactly 1\u202fkg is charged the $10 rate. A package weighing exactly 5\u202fkg is charged the $10 rate. A non\u2011positive weight raises a ValueError, while a non\u2011positive order total uses the standard weight\u2011based rates. The function returns the exact float value (e.g., 5.0, 10.0, 20.0, or 0.0) without rounding. Weight of 0\u202fkg is invalid and raises a ValueError. Example: 1\u202fkg, $50 \u2192 $10; 5\u202fkg, $0 \u2192 $10.",
+     "cost_usd": 0.0149257,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 55.8
+  },
+  {
+   "id": "shift_length",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004843,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 5,
+     "executed": 12,
+     "alignment": 0.4166666666666667,
+     "questions": 4,
+     "question_texts": [
+      "Can a shift span midnight, meaning the end time may be earlier on the clock than the start time (e.g., start '23:00', end '05:00')?",
+      "If start and end times are identical, should the function return 0 or treat it as an error/invalid input?",
+      "Should the function validate input format and raise exceptions for malformed or out-of-range times, or is it guaranteed to receive strictly valid 'HH:MM' strings?",
+      "Is there an expected maximum shift duration (e.g., shifts never exceed 24 hours), or should the implementation support arbitrary-length durations?"
+     ],
+     "clarified_spec": "Given a work shift's start and end times as 'HH:MM' strings (24-hour clock), return the length of the shift in minutes. A shift may span midnight when the end time is earlier than the start time. Identical start and end times return 0 minutes. The function validates input format and raises ValueError for out-of-range hours or minutes. Supported durations are up to but not including 24 hours.",
+     "cost_usd": 0.0026992,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 7,
+     "executed": 12,
+     "alignment": 0.5833333333333334,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should a shift that ends earlier than it starts be treated as crossing midnight?",
+      "If a shift starts and ends at the exact same clock time (e.g., 10:00\u201110:00), should the length be reported as 0 minutes or as a full 24\u2011hour day (1440 minutes)?",
+      "When the input strings are not in the expected 'HH:MM' format (e.g., full dates), should the function raise an exception or return a sentinel value such as None/0?",
+      "If the end time is earlier than the start time (e.g., 23:00\u201101:00), should the function return a negative minute count, raise an error, or treat it as an overnight shift?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Given a work shift's start and end times as 'HH:MM' strings (24-hour clock), return the length of the shift in minutes. If the end time precedes the start time, treat the shift as crossing midnight and return a positive minute count. Identical start and end times yield a length of zero minutes. An input not matching 'HH:MM' format raises an exception. When the end time is earlier than the start time, the function raises a ValueError. Hours outside 00\u201123 or minutes outside 00\u201159 raise a ValueError. Single\u2011digit hour or minute components are accepted and parsed. Shifts exceeding 24 hours are supported; total minutes are computed without a 24\u2011hour cap.",
+     "cost_usd": 0.0214941,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 70.1
+  },
+  {
+   "id": "split_full_name",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004695,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 4,
+     "executed": 12,
+     "alignment": 0.3333333333333333,
+     "questions": 5,
+     "question_texts": [
+      "Should names with more than two words assign the first token as 'first' and the remaining tokens as 'last', or should multi-word last names be preserved together?",
+      "How should titles, honorifics, or suffixes (e.g., 'Dr.', 'Mr.', 'Jr.', 'III') be handled \u2014 stripped, included in first/last, or ignored?",
+      "What should the function return when the input contains no spaces (a single name) \u2014 e.g., first name only with empty last name, or an error/default?",
+      "Should consecutive spaces, leading/trailing whitespace, or internal spacing be normalized before splitting?",
+      "Are there specific cultural naming conventions to support, such as East Asian family-first ordering or Spanish double surnames?"
+     ],
+     "clarified_spec": "Split a customer's full name into a first name and a last name for the CRM import. The first token becomes the first name; the last token becomes the last name; any middle tokens are collapsed into the first name. Titles, honorifics, and suffixes such as 'Dr.', 'Mr.', 'Jr.', or 'III' are stripped as separate tokens and excluded from both names. A single-word input yields that word as the first name with an empty last name. All whitespace is collapsed and leading/trailing spaces trimmed before splitting. No cultural naming conventions are applied.",
+     "cost_usd": 0.0027235,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 5,
+     "executed": 12,
+     "alignment": 0.4166666666666667,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "Should the last name be only the final word or everything after the first word?",
+      "When only one name token is provided, should it be a appears, be a first name, a last name, or both?",
+      "Should common honorifics such as \"Dr.\", \"Mr.\", \"Ms.\", \"Prof.\" be removed from the first\u2011name field?",
+      "Should a \"Last, First\" comma format be detected and the parts swapped?",
+      "Should hyphenated single\u2011token names (e.g., \"Anna-Maria\", \"o'neil-smith\") be split into separate first and last parts?"
+     ],
+     "behaviours": 7,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Split a customer's full name into a first name and a last name for the CRM import. All words except the last form the first name; the final word becomes the last name. If only a single name token is provided, it is used as the first name and the last name is empty. Known honorifics such as \u201cDr.\u201d, \u201cMr.\u201d, \u201cMs.\u201d, \u201cProf.\u201d are stripped before splitting. A comma is treated as ordinary punctuation; the substring before the first space becomes the first name. Hyphenated tokens remain unsplit; the whole token becomes the first name with an empty last name. Example: \u201cde la Cruz\u201d \u2192 {first: \u201cde la\u201d, last: \u201cCruz\u201d}; \u201cAnna-Maria\u201d \u2192 {first: \u201cAnna-Maria\u201d, last: \u201c\u201d}.",
+     "cost_usd": 0.0238386,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 61.3
+  },
+  {
+   "id": "currency_format",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005668,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "How should negative values be formatted? (e.g., '-$1,234.50', '$-1,234.50', '($1,234.50)', or just '-1,234.50)')",
+      "What rounding behavior is expected for values with more than 2 decimal places? (e.g., standard round-half-up, round-half-even, or truncation?)",
+      "How should non-finite float values (NaN, Infinity) be handled? (raise an error, return a placeholder, or assume valid input?)",
+      "Is the output format strictly '$' + number + '.00', or are locale variations (e.g., different thousands separator or decimal mark) required?)",
+      "Should integer inputs like 100 be displayed as '$100.00', or is there a different expectation for whole-dollar amounts?"
+     ],
+     "clarified_spec": "Format a dollar amount for display on an invoice, e.g. 1234.5 -> '$1,234.50'. Negative values use accounting parentheses: ($1,234.50). Round half away from zero using the decimal module's ROUND_HALF_UP. Assume valid input; no special handling required. Strict format: '$' + thousands separators + exactly 2 decimals. Integer inputs display as '$100.00'.",
+     "cost_usd": 0.0023042,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 1,
+     "executed": 12,
+     "alignment": 0.08333333333333333,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "How should negative dollar amounts be formatted on an invoice?",
+      "Should amounts that are exactly halfway between two cents (e.g., $1.005) round up to the next cent or round to the nearest even cent?",
+      "Should whole\u2011dollar amounts always show two decimal places (e.g., $0.00) or omit the cents when they are zero (e.g., $0)?",
+      "Should the amount be rounded to the nearest cent (with carry) or simply truncated to cents?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Format a dollar amount for display on an invoice, e.g. 1234.5 -> '$1,234.50'. Negative amounts are wrapped in parentheses, e.g. -3.5 becomes '($3.50)'. Half\u2011cent values round up away from zero, e.g. 1.005 \u2192 '$1.01'. Whole\u2011dollar amounts always show two decimal places, e.g. 0.0 \u2192 '$0.00'. The amount is rounded to the nearest cent with carry into dollars. Non\u2011numeric inputs raise ValueError. Negative zero is formatted as '$0.00'. Integer inputs are accepted and treated like floats. Examples: -3.5 \u2192 '($3.50)'; 0.0 \u2192 '$0.00'.",
+     "cost_usd": 0.018587,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 62.5
+  },
+  {
+   "id": "human_file_size",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 2,
+     "executed": 12,
+     "alignment": 0.16666666666666666,
+     "questions": 0,
+     "cost_usd": 0.0006511,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "Should the function use decimal (base 1000, SI units like KB, MB, GB) or binary (base 1024, MiB, GiB) units?",
+      "How many decimal places should be displayed? The example shows 1 ('1.5'), but should it be fixed, variable, or rounded/truncated?",
+      "Should there be a space between the number and the unit, e.g., '1.5 MB' vs '1.5MB'?",
+      "How should zero bytes be formatted? e.g., '0 B', '0 B', or '0'?",
+      "What is the maximum unit to display? Should the function support up to TB, PB, or stop at a certain size?"
+     ],
+     "clarified_spec": "Format a file size in bytes as a short human-readable string like '1.5 MB' for the file browser. Use 1024-based units (KiB, MiB, GiB, TiB). Display exactly one decimal place. Include a space between the number and unit. Format zero bytes as '0 B'. Stop at TB as the maximum unit.",
+     "cost_usd": 0.0019831,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 3,
+     "executed": 11,
+     "alignment": 0.2727272727272727,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "How should negative byte counts be handled?",
+      "Should byte values be shown without a decimal point?",
+      "Should the function use binary (1024\u2011based) units or decimal (1000\u2011based) units for scaling?",
+      "Should the unit suffixes follow the IEC binary prefixes (KiB, MiB, \u2026) instead of the traditional KB, MB, \u2026?",
+      "Should a trailing \u2018.0\u2019 be shown for whole\u2011number sizes in KB/MB/\u2026 (e.g., \u20181.0 KB\u2019) or omitted (e.g., \u20181 KB\u2019)?"
+     ],
+     "behaviours": 8,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Format a file size in bytes as a short human-readable string like '1.5 MB' for the file browser. Negative byte counts raise an error. Whole byte values are shown without a decimal point. Scaling uses binary units (divide by 1024) with labels KB, MB, GB, TB, PB. Unit suffixes are KB, MB, GB, TB, PB (not KiB, MiB). Sizes in KB or larger always display one decimal digit, even .0. Non\u2011int inputs raise TypeError. TB is the largest supported unit; larger values are formatted as e.g. '1024.0 TB'.",
+     "cost_usd": 0.0282922,
+     "calls": 36,
+     "rejected": 0
+    }
+   },
+   "wall_s": 82.5
+  },
+  {
+   "id": "week_number",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 7,
+     "executed": 12,
+     "alignment": 0.5833333333333334,
+     "questions": 0,
+     "cost_usd": 0.0003826,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 5,
+     "executed": 12,
+     "alignment": 0.4166666666666667,
+     "questions": 5,
+     "question_texts": [
+      "Which week numbering convention should be applied (e.g., ISO 8601, US locale, or a custom definition)?",
+      "How should invalid or malformed date strings be handled?",
+      "Should weeks start on Monday or Sunday, and how should cross-year edge cases be classified?",
+      "Is there a timezone or locale context that affects the week start day or first week definition?",
+      "Should the function treat the year as a calendar year or a fiscal year?"
+     ],
+     "clarified_spec": "Return the week number of the year for a given date ('YYYY-MM-DD'); we use it to group orders in the weekly sales report. The function uses the ISO 8601 week numbering convention with weeks starting on Monday and cross-year cases following ISO 8601. Invalid or malformed date strings return null. The year is treated as a calendar year. No timezone or locale context affects the week start day or first week definition.",
+     "cost_usd": 0.0019041,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 6,
+     "executed": 10,
+     "alignment": 0.6,
+     "questions": 2,
+     "assumptions": 2,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "Should the week number be based on the ISO week\u2011year (so early January can belong to the previous year\u2019s week 52/53) or on the calendar year (week\u202f1 always starts on\u202f1\u202fJanuary)?",
+      "What should happen when the input string is not a valid ISO\u20118601 date (e.g., '2023-13-01' or '01-01-2023')?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return the week number of the year for a given date ('YYYY-MM-DD'); we use it to group orders in the weekly sales report. The week number follows the ISO week\u2011year (week\u202f1 is the first week with at least four days in the new year, so early January dates may belong to the previous year\u2019s week\u202f52 or\u202f53). The function accepts any string that the standard library can parse as a valid calendar date; invalid strings cause the standard library to raise ValueError. For invalid inputs the function raises ValueError. The returned week number is always in the range 1\u201353; it never returns 0 or 54. The function does not enforce a strict 'YYYY-MM-DD' format; any parsable date string is accepted. Example: 2023-01-01 \u2192 52; 2023-01-02 \u2192 1.",
+     "cost_usd": 0.0175327,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 103.2
+  },
+  {
+   "id": "cart_discounts",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005056,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 1,
+     "executed": 12,
+     "alignment": 0.08333333333333333,
+     "questions": 5,
+     "question_texts": [
+      "When both `is_member` and `has_coupon` are true, should both discounts be applied, and if so, what is the order of operations (10% off first then $5 off, or $5 off first then 10% off)?",
+      "If only one discount can be used, which takes precedence: the membership discount or the coupon?",
+      "Is there a minimum cart subtotal required for the $5 coupon to be valid?",
+      "Does the $5 coupon subtract from the original subtotal, or from the price after the membership discount has been applied?",
+      "Should the final price be rounded to 2 decimal places (cents), or returned as a raw float?"
+     ],
+     "clarified_spec": "Compute the final price of a shopping cart: members get 10% off, and customers with a coupon get $5 off. Apply the 10% member discount first, then subtract the $5 coupon. Round the final amount to cents, half-up.",
+     "cost_usd": 0.0021641,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the 10\u202f% member discount be applied before the $5 coupon, or should the coupon be applied first?",
+      "Should the final price be prevented from going below $0 (i.e., floor at zero)?",
+      "Can a customer receive both the member discount and the coupon simultaneously, or should only the better discount apply?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Compute the final price of a shopping cart: members get 10% off, and customers with a coupon get $5 off. Apply the 10% member discount first, then subtract the $5 coupon (e.g., 100 \u2192 85; 50 \u2192 40). Clamp the final price at a minimum of $0. Both discounts stack (percentage then flat). Apply discounts normally even if subtotal is zero or negative, but never let the result drop below 0.00. Round the result to two decimal places using half\u2011up rounding. The $5 coupon applies to any subtotal, with the final price still floored at 0.00.",
+     "cost_usd": 0.0129907,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 55.0
+  },
+  {
+   "id": "moving_average",
+   "rep": 0,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0006618,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "Should the output list have the same length as the input (with padding like `None` or `NaN` for incomplete windows at the start), or only include averages for positions where the full window is available (length = len(values) - window + 1)?",
+      "What behavior is expected when `window` is less than or equal to 0: raise a `ValueError`, return an empty list, or return the input unchanged?",
+      "If `window` exceeds the number of values provided, should the result be an empty list, a single average of all values, or a padded list?",
+      "Should the returned averages be raw floats, or rounded to a specific number of decimal places (e.g., 2)?",
+      "What should happen if `values` is an empty list: return an empty list, or treat it as an error?"
+     ],
+     "clarified_spec": "Compute the moving average of a daily sales series with a given window size (e.g. a 7-day moving average). Output list has same length as input; first days average over available days. window <= 0 raises ValueError. If window exceeds number of values, result is a single average of all values. Returned averages are raw floats with no rounding. Empty input returns an empty list.",
+     "cost_usd": 0.0022036,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When the window size is larger than the number of data points, what should the function return?",
+      "Should a non\u2011positive window size raise an error or produce an empty result?",
+      "Should the function accept a non\u2011integer window size (e.g., 2.5) and treat it as an integer, or should it raise an error?",
+      "Should the moving\u2011average results be rounded (e.g., to two decimal places) or returned with full floating\u2011point precision?",
+      "When the input series is empty but a positive window is given, should the function return an empty list or raise an error?"
+     ],
+     "behaviours": 5,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Compute the moving average of a daily sales series with a given window size (e.g. a 7-day moving average). If window exceeds data length, return cumulative averages for each prefix. Non\u2011positive window raises ValueError. Non\u2011integer window is floored to int before computation. Each average is rounded to two decimal places. Empty input with positive window yields empty list. Partial windows at start are included, preserving input length. Non\u2011numeric values raise TypeError. Whole\u2011number floats (e.g., 2.0) are accepted as valid windows. Examples: moving_average([1.005,0.5],3)=[1.005,0.7525]; moving_average([1,2,3,4,5],0) raises.",
+     "cost_usd": 0.0222348,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 62.2
+  },
+  {
+   "id": "ctrl_sum_ints",
+   "rep": 0,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0002602,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Return the sum of a list of integers. An empty list returns 0.",
+     "cost_usd": 0.0004804,
+     "calls": 13
+    },
+    "SF": {
+     "error": "PipelineError: could not turn your free-text answer into a working implementation; try rephrasing it or pick one of the options",
+     "cost_usd": 0.0109384
+    }
+   },
+   "wall_s": 39.8
+  },
+  {
+   "id": "ctrl_c_to_f",
+   "rep": 0,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003086,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Convert a temperature from Celsius to Fahrenheit using F = C \u00d7 9/5 + 32, rounded to 2 decimal places.",
+     "cost_usd": 0.0006701,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 11,
+     "executed": 11,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should values that are exactly halfway between two centi\u2011Fahrenheit results be rounded to the nearest even hundredth (banker's rounding) or always rounded away from zero?",
+      "Should temperatures below absolute zero (\u2011273.15\u202f\u00b0C) be rejected or allowed to convert?",
+      "Should the conversion be performed with binary floating\u2011point arithmetic (IEEE\u2011754 double) or with exact decimal arithmetic before rounding?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Convert a temperature from Celsius to Fahrenheit using F = C \u00d7 9/5 + 32, rounded to 2 decimal places. Halfway values are rounded away from zero (commercial rounding). Temperatures below -273.15\u202f\u00b0C raise a ValueError. Computation uses binary double\u2011precision arithmetic before rounding. Non\u2011numeric inputs raise a TypeError. Integer inputs are accepted as exact values. Non\u2011finite floats (inf, nan) raise a ValueError. e.g., 0.02778 \u2192 32.13; -300 \u2192 raises ValueError.",
+     "cost_usd": 0.0153182,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 56.5
+  },
+  {
+   "id": "ctrl_leap_year",
+   "rep": 0,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003668,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Return True if a year is a leap year in the Gregorian calendar: years divisible by 4 are leap years, except years divisible by 100, which are leap years only if they are also divisible by 400.",
+     "cost_usd": 0.0005494,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function accept non\u2011positive years (zero or negative) and apply the leap\u2011year rule to them?",
+      "Should the Gregorian leap\u2011year rule be applied proleptically to years before the Gregorian calendar was introduced (1582\u202fCE)?",
+      "Should year\u202f0 be considered a leap year?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return True if a year is a leap year in the Gregorian calendar: years divisible by 4 are leap years, except years divisible by 100, which are leap years only if they are also divisible by 400. The rule is applied to all integer years, including zero and negative values. The rule is applied proleptically to years before 1582 CE. Year 0 is considered a leap year. A TypeError is raised for non\u2011integer inputs. For integer inputs that are not leap years, the function returns False. The rule is applied globally to the entire year 1582 (proleptic Gregorian). e.g., year 0 \u2192 True; year 100 \u2192 False.",
+     "cost_usd": 0.0149054,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 65.3
+  },
+  {
+   "id": "ctrl_fizzbuzz",
+   "rep": 0,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 10,
+     "executed": 10,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0005445,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 11,
+     "executed": 11,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Return a list of strings for the numbers 1 to n: 'Fizz' for multiples of 3, 'Buzz' for multiples of 5, 'FizzBuzz' for multiples of both, and otherwise the number itself as a string. n = 0 returns an empty list.",
+     "cost_usd": 0.0011441,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 9,
+     "executed": 9,
+     "alignment": 1.0,
+     "questions": 1,
+     "assumptions": 1,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function raise an error when given a negative upper bound, or simply return an empty list?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 10,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return a list of strings for the numbers 1 to n: 'Fizz' for multiples of 3, 'Buzz' for multiples of 5, 'FizzBuzz' for multiples of both, and otherwise the number itself as a string. n = 0 returns an empty list. For any non\u2011positive n the function returns an empty list. If n is not an int a TypeError is raised. Numbers not divisible by 3 or 5 are output as exactly str(i). The function accepts only int values; floats such as 5.0 are rejected. Example: fizzbuzz(-1) -> []",
+     "cost_usd": 0.0121931,
+     "calls": 31,
+     "rejected": 3
+    }
+   },
+   "wall_s": 60.1
+  },
+  {
+   "id": "ctrl_count_char",
+   "rep": 0,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0002937,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Return how many times the single character ch appears in the string s. Matching is case-sensitive.",
+     "cost_usd": 0.0008208,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 2,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "How should the function behave when the character argument is not a single character (e.g., empty string)?",
+      "Should the function reject a call where the character argument is not exactly one character (e.g., a longer string) instead of silently counting it as a substring?",
+      "Should the function treat Unicode characters that look the same but have different code points (e.g., composed \u2018\u00e9\u2019 vs \u2018e\u2019 + combining acute) as equal?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Return how many times the single character ch appears in the string s. Matching is case-sensitive. If ch is not a single character (including an empty string), the function returns 0. If ch does not have length 1, the function raises a ValueError with the message 'ch must be a single character'. Characters are compared by their raw Unicode code points; no normalization is performed. If s is not a string, the function raises a TypeError. The ValueError raised for invalid ch includes the exact message 'ch must be a single character'. The function counts code points exactly as provided, without any Unicode normalization. Example: count_char('caf\u00e9', '\u00e9') \u2192 1; count_char('\u00c9COLE caf\u00e9', '') \u2192 0.",
+     "cost_usd": 0.0143087,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 38.9
+  },
+  {
+   "id": "ctrl_reverse_words",
+   "rep": 0,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003011,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Reverse the order of the words in a sentence. Words are separated by single spaces and there are no leading or trailing spaces; return the reversed words joined by single spaces.",
+     "cost_usd": 0.0006872,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 1,
+     "assumptions": 0,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function accept sentences with leading, trailing, or multiple spaces, and how should it treat them?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.3333,
+     "clarified_spec": "Reverse the order of the words in a sentence. Words are separated by single spaces and there are no leading or trailing spaces; return the reversed words joined by single spaces. Any sequence of whitespace characters is treated as a single separator and leading/trailing whitespace is ignored. An empty input string yields an empty string. Words that include punctuation are considered atomic units. The original capitalization of each word is preserved. e.g., \"  \" \u2192 \"\" and \"hello   world\" \u2192 \"world hello\".",
+     "cost_usd": 0.0107253,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 38.5
+  },
+  {
+   "id": "bill_split",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005016,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 10,
+     "executed": 10,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "Should the sum of the returned list exactly equal the original `total`, or is a small cent-level discrepancy acceptable due to rounding?",
+      "How should rounding be performed when the per-person share falls exactly halfway between cents (e.g., $0.005)? Should we use round-half-up, banker's rounding (round-half-to-even), or another mode?",
+      "What should the function do if `n` is zero or negative? Should it raise a ValueError, return an empty list, or handle it differently?",
+      "Is `total` expected to always be positive, or should the function gracefully handle zero or negative totals?",
+      "Should the function validate that `n` is a positive integer, or assume the caller provides valid input?"
+     ],
+     "clarified_spec": "Split a restaurant bill evenly between n people and return how much each person pays, in dollars rounded to the cent. The sum of the returned list must exactly equal the original total. Work in whole cents using integer division; no floating-point rounding modes are needed. If n is zero or negative, raise ValueError. A $0 bill gives everyone 0.0; negative totals raise ValueError. Validate that n is a positive integer; raise ValueError otherwise.",
+     "cost_usd": 0.0023495,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should each person's share be rounded independently, or should shares be adjusted so the total paid equals the bill?",
+      "How should the function behave when the number of people is zero or negative?",
+      "When a person's share lands exactly halfway between two cents (e.g., $5.005), should the function round to the nearest even cent (banker's rounding) or always round up?",
+      "Should the function accept bill totals that contain fractions of a cent (e.g., $10.005) and round each share, or should it reject such inputs or first quantize the total to whole cents?",
+      "Should a negative bill total be permitted (producing negative shares) or should the function treat it as an error?"
+     ],
+     "behaviours": 4,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Split a restaurant bill evenly between n people and return how much each person pays, in dollars rounded to the cent. Extra cents go to the first people to match the total. Non\u2011positive n returns an empty list. Half\u2011cent values round up. Fractional\u2011cent totals raise ValueError. Negative totals raise ValueError. Non\u2011integer n raises TypeError. Zero total with positive n yields zeros. Shares use round(x,2) and are floats.",
+     "cost_usd": 0.0232721,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 81.3
+  },
+  {
+   "id": "round_temperature",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 1,
+     "executed": 12,
+     "alignment": 0.08333333333333333,
+     "questions": 0,
+     "cost_usd": 0.0003167,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "How should ties (e.g., X.5) be resolved: round half up, round half to even (banker's rounding), or round half away from zero?",
+      "What is the expected rounding behavior for negative temperatures with ties (e.g., -1.5: round to -2 or -1)?",
+      "Should the function handle non-float inputs (e.g., strings, None), and if so, what behavior is expected (raise error, coerce, or default)?",
+      "Is there a preferred rounding standard or library (e.g., decimal.ROUND_HALF_UP) to use, or should Python's built-in round() be used?",
+      "Are there any domain-specific constraints (temperature range, decimal precision) that affect the rounding logic?"
+     ],
+     "clarified_spec": "Round a temperature reading in degrees Celsius to the nearest whole degree for the dashboard display. Ties are resolved by rounding half away from zero, so -1.5 rounds to -2. Use decimal.ROUND_HALF_UP for rounding.",
+     "cost_usd": 0.0017423,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 10,
+     "executed": 12,
+     "alignment": 0.8333333333333334,
+     "questions": 1,
+     "assumptions": 0,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When a temperature is exactly halfway between two whole degrees (e.g., 2.5\u00b0C), should it round to the nearest even degree or always round away from zero?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0,
+     "clarified_spec": "Round a temperature reading in degrees Celsius to the nearest whole degree for the dashboard display. Halves are rounded away from zero (up for positives, up for negatives). Non\u2011numeric inputs raise a TypeError. NaN or infinite inputs raise a ValueError. Exact binary values are used without adjustment. Example: 2.5 \u2192 3; -3.5 \u2192 -3.",
+     "cost_usd": 0.0144631,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 86.5
+  },
+  {
+   "id": "email_dedupe",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.000412,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 8,
+     "executed": 12,
+     "alignment": 0.6666666666666666,
+     "questions": 5,
+     "question_texts": [
+      "Should the output preserve the original casing of the first occurrence of each email, or normalize all emails to lowercase (or uppercase)?",
+      "Should leading/trailing whitespace be stripped from email addresses before performing case-insensitive comparison?",
+      "Should the function assume all inputs are valid email strings, or should it handle/validate formats and reject invalid entries?",
+      "Should None values or non-string elements in the input list be skipped, treated as errors, or handled gracefully?",
+      "Are there any other normalizations beyond capitalization (e.g., sub-addressing with +tags) that should be considered when identifying duplicates?"
+     ],
+     "clarified_spec": "Remove duplicate email addresses from a newsletter signup list. Addresses that differ only in capitalization count as duplicates. Preserve the original casing of the first occurrence of each email. Strip leading and trailing whitespace from addresses before performing case-insensitive comparison. Assume all inputs are valid email strings; no format validation is needed. Skip None values and non-string elements gracefully. No other normalizations beyond stripping whitespace and case-insensitive comparison are applied.",
+     "cost_usd": 0.001861,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 1,
+     "executed": 12,
+     "alignment": 0.08333333333333333,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should surrounding whitespace (spaces, tabs, newlines) be ignored when deciding if two sign\u2011up entries are the same address?",
+      "When a duplicate is found, should the returned list keep the original capitalization of the first occurrence, or should all addresses be normalized to a single case (e.g., all lower\u2011case)?",
+      "Should empty strings be treated as valid sign\u2011up entries and kept in the deduped list, or should they be discarded as invalid?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Remove duplicate email addresses from a newsletter signup list. Addresses that differ only in capitalization count as duplicates. Leading and trailing whitespace is ignored when comparing addresses. The first occurrence\u2019s original capitalization is preserved in the result. Empty strings are kept as distinct entries and deduplicated like any other value. Non\u2011string elements and None values are skipped. Addresses lacking an '@' symbol are excluded from the output. The first occurrence\u2019s original whitespace is preserved in the output. Example: dedupe_emails([\"a@b.com\", \"A@B.COM\"]) -> [\"a@b.com\"]. Example: dedupe_emails([\"\", \"x\", \"\", \"\"]) -> [\"\", \"x\"].",
+     "cost_usd": 0.0125829,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 56.0
+  },
+  {
+   "id": "business_days",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 6,
+     "executed": 12,
+     "alignment": 0.5,
+     "questions": 0,
+     "cost_usd": 0.0008627,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 8,
+     "executed": 12,
+     "alignment": 0.6666666666666666,
+     "questions": 3,
+     "question_texts": [
+      "Should the start and end dates be included in the count if they fall on weekdays?",
+      "If the start date is after the end date, should the function return 0, raise an error, or treat the range as reversed?",
+      "If start and end are the same date, should the function return 1 if it's a weekday, or 0/other?"
+     ],
+     "clarified_spec": "Count the number of business days between two dates (given as 'YYYY-MM-DD'). Weekends don't count; ignore public holidays. Both start and end dates are included in the count if they fall on weekdays. If the start date is after the end date, swap the dates so the order never matters. If start and end are the same date, return 1 if it is a weekday, 0 if it is a weekend.",
+     "cost_usd": 0.0021782,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 5,
+     "executed": 10,
+     "alignment": 0.5,
+     "questions": 4,
+     "assumptions": 2,
+     "free_text_answers": 2,
+     "open_questions": 2,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When the start date is after the end date, should the function return zero or count business days between the earlier and later date?",
+      "Should the end date be included in the business\u2011day count?",
+      "Which days of the week are considered weekends (i.e., non\u2011business days)?",
+      "Should the start date be counted as a business day when it falls on a weekday?"
+     ],
+     "behaviours": 8,
+     "fanout_executed": 12,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0909,
+     "clarified_spec": "Count the number of business days between two dates (given as 'YYYY-MM-DD'). Weekends don't count; ignore public holidays. If start is after end, the dates are swapped before counting. The end date is included in the count. Weekends are Saturday and Sunday. The start date is counted when it falls on a weekday. Invalid inputs raise a ValueError. When start and end are the same weekday, the result is 1. Example: business_days_between('2024-01-01','2024-01-01') \u2192 1; business_days_between('2024-01-06','2024-01-08') \u2192 1.",
+     "cost_usd": 0.0320105,
+     "calls": 35,
+     "rejected": 1
+    }
+   },
+   "wall_s": 85.5
+  },
+  {
+   "id": "slugify",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0006177,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "{'Should the slug be converted to lowercase, or should the original case be preserved?': None}",
+      "{'How should spaces and consecutive special characters be handled? (e.g., replaced with a single hyphen, underscore, or removed entirely?)': None}",
+      "{'Should non-ASCII characters (e.g., accented letters) be transliterated to ASCII, removed, or kept as-is?': None}",
+      "{'Should leading and trailing non-alphanumeric characters be trimmed, and should the result avoid starting or ending with a hyphen?': None}",
+      "{'Is there a maximum length constraint for the slug, or should it be generated without length limits?': None}"
+     ],
+     "clarified_spec": "Turn a blog post title into a URL slug. Convert the slug to lowercase. Replace spaces and consecutive special characters with a single hyphen. Transliterate non-ASCII characters to their base ASCII letter. Trim leading and trailing non-alphanumeric characters and ensure the result does not start or end with a hyphen. No length limits apply.",
+     "cost_usd": 0.0018267,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "How should accented or non\u2011ASCII characters be handled in the slug?",
+      "Should existing hyphens and underscores be preserved, turned into hyphens, or removed?",
+      "Should an apostrophe be treated as a word separator (producing a hyphen) or be removed entirely so the surrounding words join together?",
+      "When the title is empty, should the slug be an empty string or a placeholder such as \"untitled\"?",
+      "Is there a maximum length for the slug, after which it should be truncated (or hashed) to keep URLs short?"
+     ],
+     "behaviours": 5,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.4167,
+     "clarified_spec": "Turn a blog post title into a URL slug. Accented letters become their base letters. Hyphens and underscores become hyphens, with runs collapsed. Apostrophes are stripped, joining adjacent words. An empty title yields an empty slug. No length limit; the full normalized title is used. Non\u2011string titles return an empty string. Output is always lowercase. Consecutive spaces, hyphens, or special characters collapse into a single hyphen. Example: M\u00fcnchen \u2192 munchen; A-b_c d \u2192 a-b-c-d.",
+     "cost_usd": 0.0276761,
+     "calls": 36,
+     "rejected": 0
+    }
+   },
+   "wall_s": 76.7
+  },
+  {
+   "id": "median",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 11,
+     "executed": 11,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0004658,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "What should be returned when the input list is empty (return None, raise an error, or return 0.0)?",
+      "For an even number of elements, should the median be computed as the average of the two middle values, or should it return the lower/upper middle value specifically?",
+      "Should the function validate or handle non-finite or negative values (e.g., NaN, infinity, negative response times), or assume all inputs are valid positive milliseconds?",
+      "Is None a valid input that should be treated as an empty list, or should the function strictly expect list[float]?",
+      "Should the result be rounded to a specific decimal precision, or returned as the exact floating-point result of the calculation?"
+     ],
+     "clarified_spec": "Return the median of a list of response times (in milliseconds) for the latency dashboard. Return None when the input list is empty. For an even number of elements, compute the median as the average of the two middle values. Assume all inputs are valid positive milliseconds. Strictly expect list[float]. Return the exact floating-point result.",
+     "cost_usd": 0.0018802,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 10,
+     "executed": 10,
+     "alignment": 1.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "What should the function return when the input list of response times is empty?",
+      "Should the median be returned as a floating\u2011point number with full precision, or rounded to the nearest whole millisecond?",
+      "For an even number of observations, should the median be the arithmetic mean of the two middle values, or should it be one of the middle values (lower or upper)?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 11,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return the median of a list of response times (in milliseconds) for the latency dashboard. If the list is empty, return None. Return the exact float median, no rounding. For even counts, use the mean of the two middle sorted values. Include negative numbers; silently skip non\u2011numeric entries. Treat inf as maximum, skip NaN. Skip invalid entries; return None only when no valid values remain. median([]) \u2192 None; median([1,2]) \u2192 1.5",
+     "cost_usd": 0.0111983,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 48.8
+  },
+  {
+   "id": "age_on_date",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005566,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 4,
+     "executed": 11,
+     "alignment": 0.36363636363636365,
+     "questions": 4,
+     "question_texts": [
+      "If `on` is before `birthdate`, should the function return `0`, raise a `ValueError`, or return a negative integer?",
+      "For individuals born on February 29th, how should the anniversary be observed in non-leap years: February 28th or March 1st?",
+      "Should the function validate input date strings and raise `ValueError` for malformed or non-existent dates (e.g., \"2023-02-30\"), or assume inputs are always valid ISO dates?",
+      "If the `on` date exactly equals the birthdate, should the returned age be `0` (the day of birth) or `1` (the first year completed after birth)?"
+     ],
+     "clarified_spec": "Calculate a person's age in whole years as of a given date. Both dates are 'YYYY-MM-DD' strings. If `on` is before `birthdate`, raise ValueError. For individuals born on February 29th, the anniversary is observed on March 1st in non-leap years. Validate input date strings and raise ValueError for malformed or non-existent dates. If the `on` date exactly equals the birthdate, the returned age is 0.",
+     "cost_usd": 0.0033479,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 2,
+     "question_texts": [
+      "Should the function return a negative number when the target date is before the birthdate, or should it clamp the result at zero?",
+      "For a person born on 29\u202fFebruary, should the birthday be considered 28\u202fFebruary in non\u2011leap years?",
+      "When the input strings are not valid ISO dates, should the function raise an exception or return a sentinel value (e.g., None)?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.8333,
+     "clarified_spec": "Calculate a person's age in whole years as of a given date. Both dates are 'YYYY-MM-DD' strings. Clamp age at zero for any target date earlier than the birthdate. For a birthdate of 29 February, the birthday remains 29 February; age increments only on 29 February (or 1 March in non\u2011leap years). Invalid ISO date strings cause a ValueError to be raised. Calendar\u2011impossible dates such as 2023\u201102\u201130 also raise ValueError. Age is computed using the standard month\u2011day anniversary rule (subtract one year if the target month\u2011day has not yet occurred relative to the birth month\u2011day). Example: age_on('2000-02-29','2001-02-28') \u2192 0; age_on('2023-12-31','invalid') \u2192 raises.",
+     "cost_usd": 0.0236518,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 78.4
+  },
+  {
+   "id": "parse_slash_date",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004952,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "For date strings like '03/04/2025', should the format be interpreted as MM/DD/YYYY or DD/MM/YYYY, and what is the default locale assumption?",
+      "How should the function handle invalid, missing, or unparseable date strings \u2014 raise a ValueError, return a default string, or something else?",
+      "Should leading and trailing whitespace be automatically stripped from the input before parsing?",
+      "Beyond 'MM/DD/YYYY', are there other date formats (e.g., DD-MM-YYYY, YYYY-MM-DD) that must be supported?",
+      "Is there a specific region or country convention for the supplier's CSV exports that would resolve the MM/DD vs DD/MM ambiguity?"
+     ],
+     "clarified_spec": "Parse the date column from our supplier's CSV export (values look like '03/04/2025') and return it as an ISO 'YYYY-MM-DD' string. The format is always DD/MM/YYYY, as the supplier is in Germany. Surrounding whitespace is ignored. Raise ValueError for any input that does not match the valid DD/MM/YYYY pattern or is not a real calendar date. Only the DD/MM/YYYY format (with optional leading zeros and two-digit year expansion) is supported.",
+     "cost_usd": 0.0024505,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 3,
+     "executed": 12,
+     "alignment": 0.25,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the parser treat the first numeric component as month or day, and must it accept non\u2011zero\u2011padded or two\u2011digit\u2011year inputs?",
+      "Should the parser accept dates that use delimiters other than '/' (such as '-' or '.')?",
+      "Should surrounding whitespace or newline characters be stripped before parsing?",
+      "Should the parser validate that month and day values form a real calendar date (e.g., reject 02/29/2025)?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0,
+     "clarified_spec": "Parse the date column from our supplier's CSV export (values look like '03/04/2025') and return it as an ISO 'YYYY-MM-DD' string. Treat the first component as day, zero\u2011pad month and day, and keep the year as given. Accept only '/' as delimiter; any other separator causes a failure. Trim leading and trailing whitespace and newlines before parsing. Validate month and day against the Gregorian calendar and raise on invalid dates. Raise ValueError for empty, None, or non\u2011parseable inputs. Map two\u2011digit years 00\u201199 to 2000\u20112099. Extract the first valid date pattern from the string. e.g., '3/4/2025' \u2192 '2025-4-3'; '03-04-2025' raises.",
+     "cost_usd": 0.021382,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 112.6
+  },
+  {
+   "id": "word_count",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0002619,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 3,
+     "executed": 12,
+     "alignment": 0.25,
+     "questions": 5,
+     "question_texts": [
+      "Should words be defined strictly as whitespace-separated tokens, or should leading/trailing punctuation be stripped before counting?",
+      "How should hyphenated words or contractions (e.g., 'well-known', 'don't') be counted \u2014 as one word or multiple?",
+      "Should the function normalize multiple spaces, tabs, and newlines into single delimiters, or treat each whitespace character as a separator?",
+      "Should HTML tags, markdown, or other formatting markup be stripped before counting words, or treated as part of the text?",
+      "What should the function return for empty strings or inputs containing only whitespace \u2014 0, or should it raise a ValueError?"
+     ],
+     "clarified_spec": "Count the number of words in a student's essay so we can enforce the word limit. Words are runs of letters and digits; leading and trailing punctuation is stripped as part of tokenization. Hyphenated compounds and contractions or possessives count as one word each. Multiple whitespace characters are normalized into single delimiters. The function returns 0 for empty or whitespace-only inputs.",
+     "cost_usd": 0.0020338,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 1,
+     "executed": 7,
+     "alignment": 0.14285714285714285,
+     "questions": 7,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should periods inside abbreviations be ignored or split words?",
+      "How should hyphens, underscores, and apostrophes be handled when counting words?",
+      "Should a hyphen between words count as one word or two?",
+      "Should apostrophes and hyphens within a name be treated as part of the same word?",
+      "Should every ASCII punctuation character (commas, semicolons, colons, quotes, parentheses, brackets, etc.) be stripped before counting words, or only a selected subset?",
+      "When punctuation characters appear consecutively (e.g., ellipsis \"...\" or multiple exclamation marks), should they be removed entirely or act as separators between words?",
+      "Should tokens that contain mixed case or alphanumeric runs (e.g., camelCase, \"wordCount\", \"v2.0\") be counted as a single word or split into multiple words?"
+     ],
+     "behaviours": 5,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Count the number of words in a student's essay so we can enforce the word limit. Periods in abbreviations are removed, counting the abbreviation as one word. Hyphens, underscores, and apostrophes are stripped, merging adjacent parts. A hyphen between words joins them into a single word. Apostrophes and hyphens inside a name keep the name as one word. All ASCII punctuation acts as word boundaries, splitting tokens. Consecutive punctuation characters are ignored, not used as separators. CamelCase and alphanumeric runs are split at case or digit transitions. Non\u2011string inputs return 0. Empty or whitespace\u2011only strings count as 0 words. URLs and email addresses are treated as single words.",
+     "cost_usd": 0.0333384,
+     "calls": 36,
+     "rejected": 0
+    }
+   },
+   "wall_s": 94.1
+  },
+  {
+   "id": "truncate_preview",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003998,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Truncate a product description to max_len characters for the listing card, adding '...' when it gets cut off.",
+     "cost_usd": 0.0014633,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When max_len is smaller than the required minimum (4), should the function still add '...' or just return the truncated original text?",
+      "Should the truncation stop at a word boundary instead of cutting a word in half?",
+      "Should the ellipsis be the three ASCII dots '...' or the single Unicode ellipsis character '\u2026'?",
+      "Should character counting treat each Unicode code point as one character, or should it count user\u2011perceived grapheme clusters (e.g., emoji sequences, combined accents)?"
+     ],
+     "behaviours": 4,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Truncate a product description to max_len characters for the listing card, adding '...' when it gets cut off. If max_len is less than 4, return the text truncated to max_len characters without an ellipsis. Otherwise cut the text at max_len\u20113 code points and append three ASCII periods '...'. Count length by Unicode code points (len(text)). The max_len limit includes the trailing '...' characters. If the text length is already \u2264 max_len, return it unchanged. e.g., truncate('Hello world',6) \u2192 'Hel...' ; truncate('Hello world',3) \u2192 '...'",
+     "cost_usd": 0.0173021,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 68.7
+  },
+  {
+   "id": "percent_change",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 11,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004279,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "What should the function return when old is 0 to avoid division by zero (e.g., return None, 0.0, or raise an error)?",
+      "Should rounding use Python's built-in round() (banker's rounding) or standard mathematical rounding (half up) for the one decimal place?",
+      "How should negative old values be handled\u2014should the percentage change be calculated mathematically, or should the function return None for certain sign combinations?",
+      "What should the return value be when both old and new are 0 (0.0 or None)?",
+      "Should the function validate inputs and handle non-finite values like NaN or Infinity gracefully?"
+     ],
+     "clarified_spec": "Calculate the percentage change from last month's value to this month's value for the KPI dashboard, rounded to one decimal place using Python's built-in round(). Use the absolute value of old as the divisor. Return 0.0 when both old and new are 0; return None when old is 0 and new is not 0. Return None for NaN or Infinity inputs.",
+     "cost_usd": 0.0023396,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 6,
+     "executed": 12,
+     "alignment": 0.5,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "When the previous month's value is negative, should the percentage change use its absolute value?",
+      "When last month's value is zero, should the function indicate \u201cno calculable change\u201d (return\u202fNone) or treat it as a 0\u202f% change / raise an error?",
+      "Should a zero\u2011to\u2011zero transition (old\u202f=\u202f0, new\u202f=\u202f0) be reported as \u201cno data\u201d (None) or as a 0\u202f% change?",
+      "For values that round exactly halfway (e.g., 0.05\u202f%), should the function use Python\u2019s \u201cbanker\u2019s rounding\u201d (to nearest even) or round halves away from zero?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 12,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0909,
+     "clarified_spec": "Calculate percentage change from last month to this month for the KPI dashboard, rounded to one decimal. Use absolute value of a negative prior month so sign follows new vs old. Return None for zero prior month unless both months are zero, then return 0.0. Apply Python's banker's rounding. Return raw value without overflow guards. Return signed percentage when signs differ. Return None for NaN or infinity inputs.",
+     "cost_usd": 0.0237839,
+     "calls": 36,
+     "rejected": 1
+    }
+   },
+   "wall_s": 112.0
+  },
+  {
+   "id": "merge_intervals",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0006308,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "If one interval ends at time T and another begins at T, should they be merged into a single block (e.g., [1,5] and [5,10] become [1,10])? ",
+      "What should the function return when the input list is empty?",
+      "How should intervals where start > end be handled (e.g., [10, 5])?",
+      "Must the output merged blocks be sorted by start time, or is the relative order from the input preserved?",
+      "Should zero-duration intervals (start == end) be included in the merge process or filtered out?"
+     ],
+     "clarified_spec": "Merge overlapping meeting time ranges into busy blocks. Each range is [start, end] in minutes since midnight. Adjacent intervals where one ends exactly when another begins are merged into a single block. An empty input list returns an empty list. Intervals with start > end are treated as invalid and excluded from processing. Output merged blocks are sorted by start time. Zero-duration intervals where start == end are included in the merge process.",
+     "cost_usd": 0.0022472,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "assumptions": 0,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [],
+     "behaviours": 0,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Merge overlapping meeting time ranges into busy blocks. Each range is [start, end] in minutes since midnight. Intervals with start greater than end or containing non\u2011integer values raise a ValueError. Intervals that touch (one end equals another start) are merged into a single block. An empty input list returns an empty list.",
+     "cost_usd": 0.005495,
+     "calls": 29,
+     "rejected": 0
+    }
+   },
+   "wall_s": 72.0
+  },
+  {
+   "id": "top_k_ties",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 9,
+     "executed": 12,
+     "alignment": 0.75,
+     "questions": 0,
+     "cost_usd": 0.0004854,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 3,
+     "question_texts": [
+      "How should ties in score be resolved when multiple players have the same score?",
+      "What should happen if k exceeds the number of players in the input dictionary?",
+      "What should the function return if k is less than or equal to 0?"
+     ],
+     "clarified_spec": "Return the names of the top k players on the leaderboard, highest score first. Break ties alphabetically by name. If k exceeds the number of players, return all player names sorted by the same rules. If k is less than or equal to 0, return an empty list [].",
+     "cost_usd": 0.0015274,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "What should the function return when k is negative?",
+      "When several players have the same score, how should the function decide which ones appear first?",
+      "If k is larger than the number of players, should the function return all players or signal an error / return an empty list?",
+      "Should alphabetical tie\u2011breaking be case\u2011insensitive (e.g., 'alice' and 'Alice' treated equally) or case\u2011sensitive as in standard string ordering?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Return the names of the top k players on the leaderboard, highest score first. If k is negative, the function returns an empty list. When players share the same score, they are ordered by name in ascending case\u2011insensitive alphabetical order. If k exceeds the number of players, all player names are returned. When k is zero, the function returns an empty list. If the scores dictionary is empty, the function returns an empty list. Example: top_k_players(scores={'Alice':10,'Bob':20}, k=-1) returns []; top_k_players(scores={'alice':10,'Bob':10}, k=1) returns ['alice'].",
+     "cost_usd": 0.0177161,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 108.6
+  },
+  {
+   "id": "password_strength",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 6,
+     "executed": 12,
+     "alignment": 0.5,
+     "questions": 0,
+     "cost_usd": 0.0006598,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "How should the 'medium' and 'weak' categories be defined, given that only 'strong' (>=12 chars + all 4 character types) is specified?",
+      "Which set of characters qualifies as 'symbols' for the purpose of strong password validation?",
+      "How should the function handle edge cases such as empty strings, None, or non-string inputs?",
+      "Is there an explicit minimum length threshold for the 'medium' category (e.g., 8 characters), or is it determined solely by exclusion from 'strong' and 'weak'?",
+      "Should the classification consider common or predictable password patterns (e.g., sequential digits, repeated characters) as 'weak' regardless of length and category coverage?"
+     ],
+     "clarified_spec": "Classify a password as 'weak', 'medium', or 'strong'. A strong password is at least 12 characters long and contains uppercase letters, lowercase letters, digits, and symbols. Medium = not strong, length >= 8, and at least 3 of 4 character classes. Weak = everything else. Symbols are any character that is not a letter or digit, including spaces. Return 'weak' for None, non-string types, and empty strings. Classification is based solely on length and character class coverage.",
+     "cost_usd": 0.0026813,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 11,
+     "alignment": 0.0,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 4,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "Should a password with spaces count as having a symbol for medium classification?",
+      "Should an 8\u2011character all\u2011lowercase password be rated medium?",
+      "Should a password be considered 'medium' only when it is at least 8 characters long, or would a longer minimum (e.g., 10 characters) be more appropriate?",
+      "Should a password need three of the four character types to be 'medium', or would two types be sufficient?",
+      "Should non\u2011ASCII letters (e.g., accented characters) count as uppercase or lowercase for classification?"
+     ],
+     "behaviours": 4,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.8333,
+     "clarified_spec": "Classify a password as 'weak', 'medium', or 'strong'. A strong password is at least 12 characters long and contains uppercase, lowercase, digits, and symbols. Medium requires at least 8 characters and at least two character categories; spaces count as symbols. An 8\u2011character password with only one category is weak. Passwords shorter than 12 characters are never strong, even with all four categories. Unicode letters count as upper\u2011 or lowercase. Non\u2011string inputs return 'weak'. The function returns exactly the lowercase strings 'weak', 'medium', 'strong'. e.g., 'Password1' \u2192 'medium'.",
+     "cost_usd": 0.0238555,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 124.4
+  },
+  {
+   "id": "title_case",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0007711,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 6,
+     "executed": 12,
+     "alignment": 0.5,
+     "questions": 5,
+     "question_texts": [
+      "Which style guide (e.g., AP, Chicago, MLA) or custom rule set should determine which words are lowercased as minor words?",
+      "Should short minor words like articles, conjunctions, and prepositions be lowercased when they are not the first or last word?",
+      "How should hyphenated or compound words be capitalized (e.g., 'state-of-the-art' or 'editor-in-chief')?",
+      "How should existing acronyms, all-caps terms, or brand names (e.g., 'iPhone', 'HTML', 'API') be handled?",
+      "Should the first and last words of the headline always be capitalized regardless of their part of speech, and how should leading/trailing whitespace or symbols be treated?"
+     ],
+     "clarified_spec": "Convert a blog headline to title case using a custom minor-word list. Lowercase minor words unless they are the first or last word. Capitalize each element within hyphenated words individually. Leave existing acronyms, all-caps terms, or brand names as typed. Always capitalize the first and last words. Trim leading/trailing whitespace and collapse runs of whitespace to single spaces. Example: 'the quick brown fox' becomes 'The Quick Brown Fox'. Example: 'state-of-the-art design' becomes 'State-of-the-Art Design'.",
+     "cost_usd": 0.0030694,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 6,
+     "executed": 11,
+     "alignment": 0.5454545454545454,
+     "questions": 8,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the last word be capitalized even if it is a minor word such as \u201cthe\u201d?",
+      "Should the function preserve original whitespace, including multiple spaces and leading/trailing spaces?",
+      "Which common words should be treated as minor (lowercased) in title case?",
+      "Should short prepositions like \u201cof\u201d be lowercased in title case?",
+      "Should hyphenated compounds be title\u2011cased per component or as a single word?",
+      "Should words that are written in all caps (e.g., acronyms or shouted words) be converted to normal title case, or left exactly as they appear?",
+      "Should a word that contains an apostrophe be title\u2011cased as a single token (capitalizing only the first character) or should each side of the apostrophe be capitalized separately?",
+      "Should the first word be capitalized using full Unicode rules (so a leading accented lowercase letter becomes uppercase), or is it acceptable to leave such words unchanged?"
+     ],
+     "behaviours": 9,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "First and last capitalized; minor lowercased except last. Collapse consecutive spaces; trim ends. Only a fixed short minor list. Short prepositions lowercased. Hyphenated treated as one word. All\u2011caps title\u2011cased. Apostrophe words capitalize first character. First word Unicode capitalized. Empty or None returns empty; non\u2011string raises TypeError. Capitalize first character only; rest unchanged. Numbers unchanged; alphabetic words title\u2011cased.",
+     "cost_usd": 0.0440282,
+     "calls": 38,
+     "rejected": 0
+    }
+   },
+   "wall_s": 133.7
+  },
+  {
+   "id": "page_count",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004029,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Given the total number of search results and the page size, return how many pages the paginator should show.",
+     "cost_usd": 0.0013496,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 2,
+     "assumptions": 1,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should a non\u2011positive page size produce zero pages or raise an error?",
+      "Should a negative total_items value be treated as zero pages or cause an error?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.4167,
+     "clarified_spec": "Given the total number of search results and the page size, return how many pages the paginator should show. A non\u2011positive page size raises an error. A negative total_items raises an error. Zero total_items with a positive page size returns 1 page. Any positive total_items returns at least 1 page. Example: page_count(total_items=2, page_size=-1) raises. Example: page_count(total_items=0, page_size=10) returns 1.",
+     "cost_usd": 0.0123001,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 114.3
+  },
+  {
+   "id": "normalize_phone",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005685,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "Should the output include the US country code (+1) or return just the 10-digit national format?",
+      "How should the function handle common formatting characters like parentheses, dots, dashes, and spaces?",
+      "Should phone extensions (e.g., 'x123' or 'ext 123') be preserved in the output, dropped, or appended separately?",
+      "Should 7-digit local numbers be accepted and normalized to 10 digits, or rejected as incomplete?",
+      "What should happen if the input contains non-US digits or invalid characters \u2014 should the function raise an error, return an empty string, or normalize by extracting digits only?"
+     ],
+     "clarified_spec": "Normalize the US phone numbers people type into the signup form so we store them in one consistent format. Store E.164: '+1' followed by the 10-digit number. Ignore all formatting characters (spaces, dashes, dots, parentheses, '+'). Drop extensions. Reject as incomplete (must result in exactly 10 digits). Normalize by extracting digits only; raise ValueError if exactly 10 digits are not obtained after cleaning. E.g., '(555) 123-4567' becomes '+15551234567'; '555-1234' raises ValueError.",
+     "cost_usd": 0.0021799,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 8,
+     "alignment": 0.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 4,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "What should normalize_phone return when the input contains no digits?",
+      "Is the '(XXX) XXX-XXXX' display format the required storage format, or should we store a canonical E.164 string like '+1XXXXXXXXXX'?",
+      "Should a leading '+1' or '001' country code be stripped the same way as a plain leading '1'?",
+      "When the cleaned digit count is not exactly 10, should we return the original raw string or signal failure (e.g., empty string or error)?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.25,
+     "clarified_spec": "Normalize the US phone numbers people type into the signup form so we store them in one consistent format. No digits \u2192 return ''. Store as E.164 '+1XXXXXXXXXX' (e.g., '5551234567' \u2192 '+15551234567'). Strip leading '+1', '001', or '1' before length check. Not exactly 10 digits \u2192 return '' (e.g., '55512345' \u2192 ''). Remove extensions like 'x123' or 'ext 123' before normalizing. Letter\u2011based vanity numbers are invalid \u2192 return ''. Non\u2011US country codes: strip code; keep digits only if they become 10 US digits, else return raw input.",
+     "cost_usd": 0.0250709,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 160.3
+  },
+  {
+   "id": "letter_grade",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004697,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 11,
+     "executed": 12,
+     "alignment": 0.9166666666666666,
+     "questions": 5,
+     "question_texts": [
+      "Should scores outside the 0\u2013100 range (e.g., negative values or values > 100) be clamped, rejected, or mapped to a specific grade?",
+      "Does the function need to support plus/minus letter grades (e.g., A-, B+) or return only A, B, C, D, F?",
+      "For decimal scores near boundaries (e.g., 89.9 or 59.5), is the grade determined strictly by the integer interval, or is any rounding applied before evaluation?",
+      "How should non-finite float values (NaN, infinity) be handled?",
+      "Is there an expectation to cap the maximum score at 100, or does 'A for 90 and above' apply to any value >= 90 regardless of upper bound?"
+     ],
+     "clarified_spec": "Convert a student's percentage score to a letter grade: A for 90 and above, B for the 80s, C for the 70s, D for the 60s, and F below 60. Negative scores raise ValueError; scores > 100 are mapped to 'A'. Return only A, B, C, D, F. First round to nearest whole number with .5 rounding up, then apply cut-offs. Treat NaN and infinity as invalid input and raise ValueError. 'A for 90 and above' applies to any value >= 90, including extra credit > 100.",
+     "cost_usd": 0.0028082,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 2,
+     "assumptions": 2,
+     "free_text_answers": 2,
+     "open_questions": 2,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should scores outside the typical 0\u2011100 range (e.g., negative values or values above 100) be considered invalid and cause an error, or be graded using the same cut\u2011offs?",
+      "Should the percentage be rounded to the nearest whole number before determining the letter grade?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 11,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Convert a student's percentage score to a letter grade: A for 90 and above, B for the 80s, C for the 70s, D for the 60s, and F below 60. Scores outside the 0\u2011100 range are either clamped to the nearest bound or cause a ValueError before grading. The percentage is rounded to the nearest integer before determining the letter grade. Non\u2011numeric inputs raise a TypeError. Only strict single\u2011character grades A through F are returned.",
+     "cost_usd": 0.0114733,
+     "calls": 32,
+     "rejected": 2
+    }
+   },
+   "wall_s": 130.7
+  },
+  {
+   "id": "shipping_cost",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0005072,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 5,
+     "question_texts": [
+      "Does \"under 1 kg\" exclude 1 kg, and does \"between 1 and 5 kg\" include 1 kg? (i.e., where does weight == 1 fall?)",
+      "Does \"between 1 and 5 kg\" include 5 kg, and do \"heavier packages\" start strictly above 5 kg (weight > 5) or at/above 5 kg (weight >= 5)?",
+      "Does \"orders over $50 ship free\" mean order_total > 50 or order_total >= 50?",
+      "When order_total meets the free shipping threshold, is the shipping cost always $0 regardless of package weight?",
+      "Are input values guaranteed to be non-negative, or should the function validate/handle negative weights/order totals?"
+     ],
+     "clarified_spec": "Calculate the shipping cost: packages under 1 kg cost $5, packages from 1 kg up to and including 5 kg cost $10, and packages over 5 kg cost $20. Orders with total strictly greater than $50 ship free ($0 regardless of weight). Weight must be positive; weight_kg <= 0 raises ValueError. Example: weight=1, order_total=30 -> $10. Example: weight=10, order_total=60 -> $0.",
+     "cost_usd": 0.0023769,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 11,
+     "alignment": 0.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should an order total of exactly $50 qualify for free shipping?",
+      "Should a package that weighs exactly 5\u202fkg be charged the middle tier ($10) or the heavy tier ($20)?",
+      "How should negative package weights be handled?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Calculate the shipping cost: packages under 1 kg cost $5, packages between 1 and 5 kg cost $10, and heavier packages cost $20. Orders over $50 ship free. An order total of exactly $50 does not qualify for free shipping. A package weighing exactly 5 kg is charged the middle tier ($10). Negative package weights raise a ValueError. A package weighing exactly 1 kg falls into the $10 tier. A negative order total raises a ValueError. The $20 rate applies as a flat fee for all packages over 5 kg. Example: shipping_cost(weight_kg=1.0, order_total=50.0) -> 10. Example: shipping_cost(weight_kg=5.0, order_total=0.0) -> 10.",
+     "cost_usd": 0.0119643,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 120.3
+  },
+  {
+   "id": "shift_length",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 11,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004839,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 4,
+     "question_texts": [
+      "If the end time is chronologically before the start time (e.g., start='23:00', end='05:00'), should the function interpret this as a shift crossing midnight (wrapping to the next day), or treat it as an invalid input?",
+      "Should the function validate that inputs are well-formed 'HH:MM' strings with valid hours (00-23) and minutes (00-59), and if so, how should it signal invalid input (e.g., raise ValueError, return -1, or return None)?",
+      "What is the expected return value when start and end times are identical (e.g., both '09:00')? Should it return 0, or is there a different convention for zero-length shifts?",
+      "If end < start and is not intended as an overnight shift (e.g., due to user error), should the function compute the absolute difference in minutes, return 0, or raise an error?"
+     ],
+     "clarified_spec": "Given a work shift's start and end times as 'HH:MM' strings (24-hour clock), return the length of the shift in minutes. If the end time is chronologically before the start time, interpret the shift as crossing midnight. Validate that inputs are well-formed 'HH:MM' strings with hours 00-23 and minutes 00-59; raise ValueError for invalid format or out-of-range values. When start and end times are identical, return 0.",
+     "cost_usd": 0.0025693,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 11,
+     "alignment": 0.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should a shift that crosses midnight be reported as a positive duration, and how should '24:00' be interpreted?",
+      "If a shift starts and ends at the exact same clock time (e.g., 09:00\u201109:00), should that be treated as a zero\u2011minute shift or a full 24\u2011hour shift?",
+      "Should a shift be allowed to last longer than 24 hours (e.g., a 25\u2011hour shift), or is the maximum duration capped at just under 24\u202fh?",
+      "Is the end minute excluded from the shift length (end\u2011start) or included (end\u2011start\u202f+\u202f1)?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Given a work shift's start and end times as 'HH:MM' strings (24\u2011hour clock), return the length of the shift in minutes. A shift that crosses midnight is measured forward across the day boundary, and '24:00' is interpreted as '00:00' of the following day. Identical start and end times yield 0 minutes. Durations may exceed 24 hours; no modulo wrap is applied. The end minute is exclusive, so duration equals end minus start. Invalid 'HH:MM' strings raise ValueError. An end time earlier than start on the same day, unless it represents a midnight crossing, raises ValueError. Exactly 24 hours (1440 minutes) is allowed. Example: 23:00\u201307:00 \u2192 480; 12:00\u201312:01 \u2192 1.",
+     "cost_usd": 0.0232157,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 193.0
+  },
+  {
+   "id": "split_full_name",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 2,
+     "executed": 11,
+     "alignment": 0.18181818181818182,
+     "questions": 0,
+     "cost_usd": 0.0005099,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 2,
+     "executed": 12,
+     "alignment": 0.16666666666666666,
+     "questions": 5,
+     "question_texts": [
+      "If the full name contains more than two words (e.g., \"Mary Jane Watson\"), which words should be assigned to `first` vs `last`?",
+      "Should prefixes, titles, or suffixes (e.g., \"Dr.\", \"Mr.\", \"Jr.\", \"III\") be stripped before splitting, and how?",
+      "How should leading, trailing, or multiple consecutive whitespace characters be handled?",
+      "What should the function return when `full_name` contains no spaces (e.g., just \"Cher\")?",
+      "For cultural or compound last names containing particles (e.g., \"de la Cruz\", \"van der Sar\"), should those particles be included in the `last` field or treated separately?"
+     ],
+     "clarified_spec": "Split a customer's full name into a first name and a last name for the CRM import. The last word is always the last name; everything before it (including middle names) is the first name. Collapse all whitespace; treat runs of spaces as a single separator. If the full name contains no spaces, the first name is the word and the last name is an empty string. Particles are included in the last name as part of the final word sequence.",
+     "cost_usd": 0.0020676,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 1,
+     "executed": 12,
+     "alignment": 0.08333333333333333,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 1,
+     "question_texts": [
+      "Should the last name be only the final word or everything after the first word?",
+      "When only one name token is provided, should it be first name, last name, both, or neither?",
+      "Should the function recognise a \"Last, First\" format (comma\u2011separated) and swap the parts, or always treat the first whitespace\u2011separated token as the given name?",
+      "Should honorific titles (Mr., Dr., Prof.) and generational suffixes (Jr., Sr., III) be stripped before splitting, or kept as part of the name fields?",
+      "Should the output preserve the original casing, or should it be normalised (e.g., title\u2011case) for consistency in the CRM?"
+     ],
+     "behaviours": 7,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Split a customer's full name into a first name and a last name for the CRM import. Last name is the final token; preceding tokens form first name. Single token becomes first name; last name empty. Detect leading \u201cLast, First\u201d pattern and swap parts. Remove known titles and suffixes before splitting. Preserve original casing after trimming whitespace. Empty string returns {'first': '', 'last': ''}. Non\u2011string inputs return {'first': '', 'last': ''}. Middle names or initials join first name.",
+     "cost_usd": 0.0315981,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 156.0
+  },
+  {
+   "id": "currency_format",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.000646,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 9,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "How should negative amounts be formatted? For example, should -1234.5 produce '-$1,234.50', '-$1,234.50', or '($1,234.50)'?",
+      "What rounding strategy should be applied when the input has more than two decimal places? For example, should 1234.505 round to 1234.51 using round-half-up, or use banker's rounding (round-half-even)?",
+      "Should the function accept input types other than float, such as int or Decimal, and if so, how should they be converted or validated?",
+      "How should floating-point imprecision near cent boundaries be handled? For example, should 0.004999999999 be displayed as $0.00 or $0.01?",
+      "Is the thousands separator always a comma and the decimal point always a period, or could locale-specific symbols vary despite the 'dollar amount' specification?"
+     ],
+     "clarified_spec": "Format a dollar amount for display on an invoice, e.g. 1234.5 -> '$1,234.50'. Negative amounts use accounting parentheses: '($1,234.50)' with no leading minus sign. Round half away from zero using the input's decimal representation. Accept int and Decimal; convert to the canonical decimal string representation before rounding. Use the exact decimal representation written; do not adjust for floating-point imprecision. Always use comma as thousands separator and period as decimal point.",
+     "cost_usd": 0.0033945,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When the amount is exactly halfway between cents (e.g., $12.345), should it round up or down?",
+      "For negative amounts, should the minus sign appear before the dollar sign ( -$3.50 ) or after it ( $-3.50 )?",
+      "Should large numbers include a thousands separator (e.g., commas) or be written as a plain digit string?",
+      "Should the currency symbol appear before the amount with no space (e.g., '$1,234.50') or after the amount (e.g., '1,234.50$')?",
+      "Should whole\u2011dollar amounts always show two decimal places (e.g., '$100.00') or may they omit the \u201c.00\u201d?"
+     ],
+     "behaviours": 5,
+     "fanout_executed": 12,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Format a dollar amount for display on an invoice. Round half\u2011cent values up (e.g., 12.345 \u2192 12.35). Show a leading minus sign for negatives. Use commas as thousands separators. Append the '$' symbol after the amount (e.g., 1,234.50$). Always show exactly two decimal digits. Raise ValueError for non\u2011numeric, NaN, or Infinity inputs. Apply half\u2011up rounding for any extra decimal places. Format both 0.0 and -0.0 as 0.00$.",
+     "cost_usd": 0.0226756,
+     "calls": 35,
+     "rejected": 1
+    }
+   },
+   "wall_s": 195.0
+  },
+  {
+   "id": "human_file_size",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 3,
+   "conditions": {
+    "B0": {
+     "aligned": 2,
+     "executed": 11,
+     "alignment": 0.18181818181818182,
+     "questions": 0,
+     "cost_usd": 0.000664,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "Should the function use decimal (SI) units (1 KB = 1000 B, 1 MB = 10\u2076 B) or binary (KiB = 1024 B, MiB = 2\u00b2\u2070 B)?",
+      "What precision and formatting style should be used? (e.g., fixed 1 decimal place, adaptive precision, or round to nearest integer when appropriate?)",
+      "What should the output be for 0 bytes? (e.g., '0 B', '0 B', or a different convention?)",
+      "Which unit prefixes are supported, and at what threshold should the function switch to the next unit (e.g., up to TB/PB, or use scientific notation for very large values)?",
+      "How should negative inputs be handled, given the documented contract specifies num_bytes >= 0?"
+     ],
+     "clarified_spec": "Format a file size in bytes as a short human-readable string like '1.5 MB' for the file browser. Use 1024-based units. Format the numeric value with fixed one decimal place using Python's f'{x:.1f}' formatting. For 0 bytes, output '0 B'. Supported prefixes are B, KB, MB, GB, TB; stop at TB. Raise ValueError for negative inputs.",
+     "cost_usd": 0.0021248,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 7,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the output always show one decimal place and use 'MB' style units, or omit the decimal for whole numbers and/or use different unit abbreviations?",
+      "Should the function use binary (1024) or decimal (1000) base, and which unit abbreviations and decimal handling?",
+      "How should negative byte values be handled?",
+      "When a size is just below a unit boundary, should it stay in the lower unit with decimal, round up, or switch base?",
+      "Should the unit abbreviations follow the IEC binary prefixes (KiB, MiB, GiB, TiB) instead of the traditional KB, MB, GB, TB?",
+      "Should the function continue scaling beyond terabytes (e.g., show petabytes, exabytes) for very large files?",
+      "When the formatted value ends exactly in .05 (e.g., 1.05\u202fKB), should the rounding be \u201cbanker\u2019s rounding\u201d (round to even) or classic \u201cround half up\u201d?"
+     ],
+     "behaviours": 10,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Format a file size in bytes as a short human-readable string like '1.5 MB' for the file browser. The function always shows exactly one decimal place. It uses binary 1024 base with KiB MiB GiB TiB abbreviations. Negative byte values raise ValueError. Values just below a unit boundary stay in the lower unit with one decimal. Scaling stops at TiB; larger units are never used. Rounding follows Python's round-to-even (banker's rounding). Zero bytes returns \"0 B\". A space always separates the numeric value and the unit. Non\u2011integer inputs raise ValueError. The original MB suffix requirement was replaced by IEC binary prefixes.",
+     "cost_usd": 0.0379173,
+     "calls": 35,
+     "rejected": 0
+    }
+   },
+   "wall_s": 208.4
+  },
+  {
+   "id": "week_number",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 1,
+   "conditions": {
+    "B0": {
+     "aligned": 6,
+     "executed": 12,
+     "alignment": 0.5,
+     "questions": 0,
+     "cost_usd": 0.0004008,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 3,
+     "executed": 8,
+     "alignment": 0.375,
+     "questions": 3,
+     "question_texts": [
+      "Should the week numbering follow ISO 8601 (week 1 = week containing the first Thursday; weeks start on Monday), or a different convention such as \"week 1 = the week containing January 1\" with weeks starting on Sunday?",
+      "How should dates that fall in the last week of the previous year or the first week of the next year be classified? (e.g., January 1\u20133 may belong to week 52 or 53 of the prior year under ISO)",
+      "What is the expected behavior when the input is not a valid 'YYYY-MM-DD' date? (e.g., raise ValueError, return -1, or assume valid input per the spec)"
+     ],
+     "clarified_spec": "Return the week number of the year for a given date ('YYYY-MM-DD'); we use it to group orders in the weekly sales report. Week numbering follows ISO 8601 (week 1 contains the first Thursday; weeks start on Monday). Dates in the first ISO week of the next year or last ISO week of the prior year are classified accordingly (e.g., 2021-01-01 to 2021-01-03 are week 53 of 2020). Assume valid 'YYYY-MM-DD' input.",
+     "cost_usd": 0.0022377,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 8,
+     "executed": 9,
+     "alignment": 0.8888888888888888,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the week number follow the ISO\u20118601 definition (week\u202f1 = first week with a Thursday) or a US\u2011style definition (week\u202f1 starts on Jan\u202f1 and weeks begin on Sunday)?",
+      "Should the function accept only strict ISO calendar dates (YYYY\u2011MM\u2011DD) or also ISO week dates like '2024\u2011W01\u201101'?",
+      "When the input string is not a valid date, should the function raise an exception or return a sentinel value such as 0?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 11,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.3,
+     "clarified_spec": "Return the week number of the year for a given date ('YYYY-MM-DD'); we use it to group orders in the weekly sales report. The function follows ISO\u20118601 week numbering (week\u202f1 is the first week containing a Thursday). Only strict 'YYYY\u2011MM\u2011DD' strings with leading zeros are accepted; any other format raises ValueError. Invalid calendar dates raise ValueError using proleptic Gregorian rules. The returned week number corresponds to the ISO week year, not the calendar year. e.g., 2024-12-31 \u2192 1; 2024-W01-01 raises.",
+     "cost_usd": 0.01212,
+     "calls": 33,
+     "rejected": 2
+    }
+   },
+   "wall_s": 135.3
+  },
+  {
+   "id": "cart_discounts",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0004557,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 5,
+     "question_texts": [
+      "In what order should the discounts be applied: member 10% off first, then $5 coupon, or $5 coupon first, then member 10% off?",
+      "Can both discounts stack for the same customer, and is there a minimum subtotal required for the $5 coupon to apply?",
+      "If the combined discounts exceed the subtotal, should the final price be capped at $0?",
+      "Should the returned amount be the pre-tax discounted subtotal, or does it include tax?",
+      "Is the $5 coupon applicable unconditionally, or does it have usage restrictions (e.g., first-time customers, specific products)"
+     ],
+     "clarified_spec": "Compute the final price of a shopping cart: members get 10% off, and customers with a coupon get $5 off. Apply the member 10% discount first, then the $5 coupon. Both discounts stack for the same customer. The $5 coupon applies unconditionally with no minimum subtotal. If the combined discounts exceed the subtotal, the final price is capped at $0.00. Return the pre-tax discounted subtotal.",
+     "cost_usd": 0.0022833,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 0,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the final price be prevented from becoming negative?",
+      "Should the result be rounded to two decimal places (cents) for monetary amounts?",
+      "Should the 10% member discount be applied before the $5 coupon, or should the coupon be deducted first?",
+      "Should negative subtotals be accepted, or should they be rejected or clamped to zero?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 12,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0833,
+     "clarified_spec": "Compute the final price of a shopping cart: members get 10% off, and customers with a coupon get $5 off. The final price is clamped at zero, never becoming negative. The result is rounded to the nearest cent (two decimal places). The $5 coupon is applied first, then the 10% member discount is applied to the reduced subtotal. Negative subtotals are treated as zero. Example: final_price(5, true, true) \u2192 0; final_price(100, true, true) \u2192 85.5.",
+     "cost_usd": 0.0483871,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 169.7
+  },
+  {
+   "id": "moving_average",
+   "rep": 1,
+   "ambiguous": true,
+   "n_axes": 2,
+   "conditions": {
+    "B0": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 0,
+     "cost_usd": 0.0006023,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 6,
+     "executed": 12,
+     "alignment": 0.5,
+     "questions": 3,
+     "question_texts": [
+      "What should the function return when `window` is greater than the length of `values`?",
+      "What should happen when `window` is less than or equal to 0?",
+      "Should the output series have length `len(values) - window + 1` (trailing window), or match `len(values)` with padding for incomplete windows?"
+     ],
+     "clarified_spec": "Compute the moving average of a daily sales series with a given window size (e.g. a 7-day moving average). If window exceeds the series length, return the average of all available values for each day. If window is less than or equal to 0, raise ValueError. The output series matches the input length, using a trailing window that averages over available days.",
+     "cost_usd": 0.0028507,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 4,
+     "assumptions": 3,
+     "free_text_answers": 2,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "When the window size exceeds the number of data points, what should the function return?",
+      "Should a non\u2011positive window size (zero or negative) be treated as an error rather than silently returning an empty list?",
+      "When the window size exactly equals the number of data points, should the function return a single overall average or a series of cumulative averages?",
+      "Should the moving\u2011average results be rounded to a fixed number of decimal places (e.g., two) for reporting, or kept as full\u2011precision floats?"
+     ],
+     "behaviours": 3,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 0.0,
+     "clarified_spec": "Compute the moving average of a daily sales series with a given window size (e.g. a 7\u2011day moving average). If the window exceeds the number of data points, return expanding\u2011window averages, one per point. Raise ValueError for window \u2264 0. When the window equals the data length, return cumulative averages for each prefix (output length = len(values)). Round each average to two decimal places. An empty input returns an empty list. Use a trailing window: output has the same length as input; for the first window\u20111 days average over the days available so far (day\u202f0 is its own value). Example: moving_average([1,2,3,4,5],2) \u2192 [1.50,2.50,3.50,4.50]; moving_average([100,0.5,1.005],10) \u2192 [100,50.25,33.84].",
+     "cost_usd": 0.0206324,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 163.4
+  },
+  {
+   "id": "ctrl_sum_ints",
+   "rep": 1,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0002678,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Return the sum of a list of integers. An empty list returns 0.",
+     "cost_usd": 0.0006171,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 6,
+     "executed": 8,
+     "alignment": 0.75,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should boolean values (True/False) be treated as integers (1/0) when summing?",
+      "Should the function accept non\u2011integer numeric types such as floats and return a float result?",
+      "Should the function work with any iterable (tuple, generator, etc.) or require a concrete list?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return the sum of a list of integers. An empty list returns 0. Booleans are summed as integers (True=1, False=0). Floats are accepted and the result may be a float. Any iterable is accepted. If the input is None or not an iterable, treat it as an empty list. Non\u2011numeric elements raise TypeError. There is no integer size limit; any Python int is allowed. Example: sum([True, 2.5]) == 3.5; sum([]) == 0.",
+     "cost_usd": 0.0107116,
+     "calls": 34,
+     "rejected": 0
+    }
+   },
+   "wall_s": 78.9
+  },
+  {
+   "id": "ctrl_c_to_f",
+   "rep": 1,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003114,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Convert a temperature from Celsius to Fahrenheit using F = C \u00d7 9/5 + 32, rounded to 2 decimal places.",
+     "cost_usd": 0.0007605,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 0,
+     "executed": 12,
+     "alignment": 0.0,
+     "questions": 3,
+     "assumptions": 3,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function accept non\u2011numeric inputs such as strings or null and try to convert them, or should it reject them with an error?",
+      "Should temperatures below absolute zero (\u2011273.15\u202f\u00b0C) be considered invalid and cause an error, or should the formula be applied regardless?",
+      "When the Fahrenheit result falls exactly halfway between two centisecond values (e.g., 32.005), should rounding follow \u201cbanker\u2019s rounding\u201d (ties to even) or the more common \u201cround half away from zero\u201d?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": false,
+     "agreement_before": 1.0,
+     "clarified_spec": "Convert a temperature from Celsius to Fahrenheit using F = C \u00d7 9/5 + 32, rounded to 2 decimal places. Reject non\u2011float arguments (including strings, null, booleans) with an exception. Raise an error for Celsius values below -273.15. Apply round\u2011half\u2011away\u2011from\u2011zero (commercial rounding) for ties. Explicitly reject boolean inputs. Raise ValueError for NaN or infinite inputs. Return a Python float produced by round(c * 9/5 + 32, 2). e.g., celsius_to_fahrenheit({'c': '20'}) raises; celsius_to_fahrenheit(-300.0) raises.",
+     "cost_usd": 0.0146866,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 93.1
+  },
+  {
+   "id": "ctrl_leap_year",
+   "rep": 1,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003609,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Return True if a year is a leap year in the Gregorian calendar: years divisible by 4 are leap years, except years divisible by 100, which are leap years only if they are also divisible by 400.",
+     "cost_usd": 0.0007615,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 1,
+     "assumptions": 1,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function accept year zero and negative years (e.g., BCE dates) and apply the same leap\u2011year arithmetic, or should it reject or treat them as non\u2011leap years because the spec says \u201cpositive year\u201d?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return True if a year is a leap year in the Gregorian calendar: years divisible by 4 are leap years, except years divisible by 100, which are leap years only if they are also divisible by 400. The function accepts only positive integers (year \u2265 1); for zero or negative values it returns False. If the argument is not an integer, a TypeError is raised. All years are evaluated using proleptic Gregorian rules, including years before 1582. Year 1 is the minimum valid input and the leap\u2011year rule applies uniformly from year\u202f1 onward. Example: is_leap_year(0) returns False.",
+     "cost_usd": 0.0103705,
+     "calls": 31,
+     "rejected": 0
+    }
+   },
+   "wall_s": 68.9
+  },
+  {
+   "id": "ctrl_fizzbuzz",
+   "rep": 1,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0005366,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 9,
+     "executed": 9,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "If n is negative (n < 0), should the function return an empty list, raise a ValueError, or handle it another way, given the doc states '>= 0' but the type accepts any int?",
+      "Is the upper bound n inclusive? I.e., should fizzbuzz(n) include the evaluation for the number n itself?",
+      "Should the function validate that n is an integer, and what exception should be raised if a non-int is passed?",
+      "Are the output strings strictly 'Fizz', 'Buzz', 'FizzBuzz' with that exact casing and concatenation order, or are variations expected?"
+     ],
+     "clarified_spec": "Return a list of strings for the numbers 1 to n: 'Fizz' for multiples of 3, 'Buzz' for multiples of 5, 'FizzBuzz' for multiples of both, and otherwise the number itself as a string. n = 0 returns an empty list. For n < 0, return an empty list. The upper bound n is inclusive. Validate that n is an int; raise TypeError for non-int inputs. Output strings use exact casing and order: 'Fizz', 'Buzz', 'FizzBuzz'.",
+     "cost_usd": 0.002881,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 10,
+     "executed": 10,
+     "alignment": 1.0,
+     "questions": 1,
+     "assumptions": 1,
+     "free_text_answers": 1,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function return an empty list when given a negative n, or should it raise an error?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return a list of strings for the numbers 1 to n: 'Fizz' for multiples of 3, 'Buzz' for multiples of 5, 'FizzBuzz' for multiples of both, and otherwise the number itself as a string. n = 0 returns an empty list. If n is negative, the function returns an empty list. Numeric values are represented using their standard decimal string representation without leading zeros. Example: fizzbuzz(-1) -> [].",
+     "cost_usd": 0.009268,
+     "calls": 32,
+     "rejected": 0
+    }
+   },
+   "wall_s": 124.4
+  },
+  {
+   "id": "ctrl_count_char",
+   "rep": 1,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0002904,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 4,
+     "question_texts": [
+      "{'question': \"If `ch` is not exactly one character (e.g., empty string or multiple characters), should the function raise a ValueError, return 0, or use Python's default substring counting behavior?\"}",
+      "{'question': \"Should the function handle `None` or non-string inputs for `s` or `ch` gracefully, or rely on Python's default type checking and let errors propagate?\"}",
+      "{'question': \"For Unicode text, should the count be based on Unicode code points or extended grapheme clusters (e.g., combined characters like 'e' + combining accent)?\"}",
+      "{'question': 'What should happen if `ch` is an empty string? Should it raise an error, return 0, or is it guaranteed by contract that `ch` will always be a single character?'}"
+     ],
+     "clarified_spec": "Return how many times the single character ch appears in the string s. Matching is case-sensitive. Count based on Unicode code points. If ch is not exactly one character, raise a ValueError. Let errors propagate for None or non-string inputs.",
+     "cost_usd": 0.0019857,
+     "calls": 15
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 2,
+     "assumptions": 2,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should an empty search string be considered a valid input, and if so, should it match at every possible position (including before the first and after the last character)?",
+      "Should the function accept a search string longer than one character and count its (non\u2011overlapping) occurrences, or should it reject such input?"
+     ],
+     "behaviours": 1,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 1.0,
+     "clarified_spec": "Return how many times the single character ch appears in the string s. Matching is case-sensitive. An empty ch is valid and matches at every position, yielding len(s)+1 occurrences. A ch longer than one character is invalid and raises ValueError. If s is not a string, raise TypeError. If ch is not a single character, raise ValueError. Non\u2011ASCII characters are counted by Unicode code points. Example: count_char(\"\", \"\") returns 1. Example: count_char(\"\u00c9COLE caf\u00e9\", \"\") returns 11.",
+     "cost_usd": 0.0126587,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 109.7
+  },
+  {
+   "id": "ctrl_reverse_words",
+   "rep": 1,
+   "ambiguous": false,
+   "n_axes": 0,
+   "conditions": {
+    "B0": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "cost_usd": 0.0003042,
+     "calls": 12
+    },
+    "B1": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 0,
+     "question_texts": [],
+     "clarified_spec": "Reverse the order of the words in a sentence. Words are separated by single spaces and there are no leading or trailing spaces; return the reversed words joined by single spaces.",
+     "cost_usd": 0.0006516,
+     "calls": 13
+    },
+    "SF": {
+     "aligned": 12,
+     "executed": 12,
+     "alignment": 1.0,
+     "questions": 2,
+     "assumptions": 1,
+     "free_text_answers": 3,
+     "open_questions": 3,
+     "likely_bugs": 0,
+     "question_texts": [
+      "Should the function collapse consecutive spaces and trim leading/trailing spaces, or preserve them as empty words?",
+      "Should the function treat any whitespace character (tabs, newlines, etc.) as a word separator, or only the ordinary space character?"
+     ],
+     "behaviours": 2,
+     "fanout_executed": 13,
+     "chosen_matches_reference": true,
+     "agreement_before": 0.0,
+     "clarified_spec": "Reverse the order of the words in a sentence. Words are separated by single spaces and there are no leading or trailing spaces; return the reversed words joined by single spaces. Consecutive spaces are collapsed to a single separator and leading/trailing spaces are trimmed before reversal. Only the ordinary space character separates words; other whitespace characters are retained as part of words. An empty input string yields an empty string. Non\u2011string inputs raise a TypeError. Invalid format such as consecutive spaces or leading/trailing spaces raises a ValueError. Example: \"   \" \u2192 \"\"; \"hello \\t world\" \u2192 \"world \\t hello\".",
+     "cost_usd": 0.0157476,
+     "calls": 33,
+     "rejected": 0
+    }
+   },
+   "wall_s": 73.1
+  }
+ ]
+}

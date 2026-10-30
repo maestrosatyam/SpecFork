@@ -197,18 +197,24 @@ Design details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 <!-- EVAL_SUMMARY -->
 A live benchmark measures intent alignment: the share of fresh implementations that match a hidden reference.
-It uses 26 ambiguous and 6 clear hand-written specs, with N=12 implementations per condition.
+It uses 26 ambiguous and 6 clear hand-written specs, with N=12 implementations per condition. The figures are
+pooled over five runs with default settings, including a re-run of the original code.
 
-| Condition (ambiguous specs) | v0.1.0 (1 run) | v0.2.0 (5 runs, range) |
-|---|---|---|
-| No clarification | 21.0% | 20–24% |
-| One ask-first prompt + rewrite | 39.0% | 39–49% |
-| SpecFork | 41.9% | 22–35% (best: mixed-model fan-out) |
+| Condition (ambiguous specs) | Intent alignment |
+|---|---|
+| No clarification | 20.8% |
+| One ask-first prompt + rewrite | 45.7% |
+| SpecFork | 33.1% |
 
-**SpecFork does not currently beat a well-prompted ask-first baseline on this metric**, and the v0.2.0 runs
-score below the single v0.1.0 run. The intervals overlap, but we treat it as a regression under investigation.
-What SpecFork adds is structural: an executed witness for every question, deterministic locked tests, and a
-measured re-fork. Full results, configurations and failure cases: [`docs/EVALUATION.md`](docs/EVALUATION.md).
+**SpecFork currently trails a well-prompted ask-first baseline on this metric.** An early single run that showed
+a tie did not reproduce.
+- **Where SpecFork wins clearly:** when the deciding behaviour only shows up once code runs (`page_count`,
+  `cart_discounts`).
+- **Where it loses:** when the owner's intent is something no sampled implementation did.
+- **What only SpecFork produces:** an executed witness for every question, deterministic locked tests, and a
+  measured re-fork.
+
+Every run, the attempted fixes and their trade-offs: [`docs/EVALUATION.md`](docs/EVALUATION.md).
 
 ## Security
 

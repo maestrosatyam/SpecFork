@@ -42,7 +42,24 @@ What this shows, plainly:
 - **What only SpecFork produces:** an executed witness for every question, deterministic locked tests, and a
   measured re-fork.
 
-<!-- OPEN_QUESTIONS_RESULT -->
+### Attempted fix: open questions (opt-in, `SPECFORK_OPEN_QUESTIONS=1`)
+
+After the witness questions, SpecFork also asks up to 3 "anything else?" questions the executed evidence did not
+cover, answered in the owner's own words. The deep model then implements the full clarified spec and the result is
+executed. Each run below has 2 repeats per item; the 95% intervals are over items.
+
+| Run | Open-question prompt | SpecFork (ambiguous) | B1 ask-first | SpecFork on clear specs (alignment / questions) |
+|---|---|---|---|---|
+| v8 (`v8-openq-broad-x2`) | broad (also asks about validation and error handling) | **41.6%** (29–55%) | 49.1% (34–65%) | 87.5% / 2.17 |
+| v9 (`v9-openq-tight-x2`) | tight (only realistic, behaviour-changing questions) | 32.2% (19–47%) | 46.8% (32–61%) | 98.6% / 1.92 |
+
+**Result: not a clean fix.**
+- The broad version lifts ambiguous-spec accuracy by about 8 points over the pooled default (33.1%), closing roughly
+  half the gap to ask-first. But on clear specs the simulated owner over-specifies, and alignment drops to 87.5%.
+- The tight version keeps clear specs correct but loses the gain.
+- Open questions therefore stay **off by default**.
+- The likely way forward is to let the owner add a free-text refinement to every chosen option, rather than adding
+  separate questions. That is tracked in the roadmap.
 
 ---
 
