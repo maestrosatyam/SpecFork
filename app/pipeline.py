@@ -140,6 +140,15 @@ def fuzz_inputs(sig: dict[str, Any], seed_text: str, k: int = 6) -> list[dict[st
     return out
 
 
+def humanize_label(label: str) -> str:
+    """Turn identifier-like labels ("extra_to_first") into readable text ("Extra to first")."""
+    label = label.strip()
+    if re.fullmatch(r"[A-Za-z0-9]+(?:[_-][A-Za-z0-9]+)+", label):
+        label = re.sub(r"[_-]+", " ", label)
+        label = label[:1].upper() + label[1:]
+    return label
+
+
 def add_trace(run: dict[str, Any], rec: CallRecord, reasoning: str = "") -> None:
     d = rec.to_dict()
     if reasoning:
@@ -387,7 +396,8 @@ class SpecFork:
             e = expl.get(f"x{k}") or {}
             if e.get("merge_into") and any(q["id"] == f"q{e['merge_into'][1:]}" for q in questions):
                 continue
-            labels = {o.get("group"): str(o.get("label", ""))[:140] for o in e.get("options") or [] if isinstance(o, dict)}
+            labels = {o.get("group"): humanize_label(str(o.get("label", "")))[:140]
+                      for o in e.get("options") or [] if isinstance(o, dict)}
             options = []
             for gid, cids in gmap.items():
                 options.append({

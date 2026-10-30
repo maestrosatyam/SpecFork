@@ -44,7 +44,8 @@ groups disagree, with each group's actual output and a representative implementa
 For each axis of disagreement decide:
 - kind "ambiguity": the spec genuinely allows more than one reasonable behaviour. Write ONE short,
   plain-English clarifying question a non-programmer product owner can answer, a one-sentence "why"
-  (the concrete consequence of picking wrong), and a short answer label (max ~12 words) for each group.
+  (the concrete consequence of picking wrong), and for each group an answer "label": a short
+  human-readable sentence (max ~12 words, e.g. "The first people pay one extra cent each"), never an identifier.
 - kind "likely_bug": one group violates what the spec clearly says (e.g. crashes on a valid input,
   wrong arithmetic). Then list the buggy groups in "bug_groups" and still give labels.
 If two axes are really the same underlying question, set "merge_into" on the later one to the earlier axis id.
