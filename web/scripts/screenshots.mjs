@@ -61,7 +61,16 @@ async function desktop(browser) {
   await sleep(500);
   await shot(page, "d07-answer-q1");
   await page.locator("section:has-text('nobody to split') [role=radiogroup] label").first().click();
+  await sleep(300);
+  await page.locator("text=Silent assumptions").scrollIntoViewIfNeeded();
+  await page.mouse.move(5, 500);
+  await sleep(300);
+  await shot(page, "d07b-assumption");
+  // Override the assumption so the "left unlocked" note shows up in the resolution.
+  await page.locator("section:has-text('negative') [role=radiogroup] label").nth(1).click();
   await sleep(400);
+  await page.mouse.move(5, 500);
+  await shot(page, "d07c-assumption-changed");
   await page.locator("text=Lock it in").scrollIntoViewIfNeeded();
   await shot(page, "d08-ready-to-lock");
 
@@ -143,6 +152,10 @@ async function mobile(browser) {
   const groups = page.locator("[role=radiogroup]");
   await groups.nth(0).locator("label").first().click();
   await groups.nth(1).locator("label").first().click();
+  await groups.nth(2).locator("label").first().click();
+  await page.locator("text=Silent assumptions").scrollIntoViewIfNeeded();
+  await sleep(300);
+  await shot(page, "m03b-assumption");
   await page.click("button:has-text('Lock it in')");
   await page.waitForSelector("text=Re-fork clarified spec", { timeout: 15000 });
   await sleep(1500);

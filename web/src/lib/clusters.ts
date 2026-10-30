@@ -1,5 +1,5 @@
 // Cluster colouring + answer-driven filtering (unit-tested in clusters.test.ts).
-import type { Cluster, Implementation, Question, Run } from "../types";
+import type { Cluster, Implementation, Question, QuestionOption, Run } from "../types";
 
 /**
  * Colour-blind-friendly categorical palette (Okabe–Ito derived, lifted for a dark background).
@@ -36,22 +36,38 @@ export function ambiguityQuestions(qs: Question[]): Question[] {
   return qs.filter((q) => q.kind === "ambiguity");
 }
 
+export function assumptionQuestions(qs: Question[]): Question[] {
+  return qs.filter((q) => q.kind === "assumption");
+}
+
 export function likelyBugQuestions(qs: Question[]): Question[] {
   return qs.filter((q) => q.kind === "likely_bug");
 }
 
+/** Questions the user must answer before locking in: ambiguities and silent assumptions. */
+export function answerableQuestions(qs: Question[]): Question[] {
+  return qs.filter((q) => q.kind === "ambiguity" || q.kind === "assumption");
+}
+
 /**
  * Given the user's (possibly partial) selections, which clusters are still consistent with them?
- * Returns null when nothing is selected (meaning: no filtering, everything is highlighted).
- * Intersection over answered ambiguity questions of the chosen option's cluster_ids.
+ * Returns null when nothing constrains (meaning: no filtering, everything is highlighted).
+ * Intersection over answered questions of the chosen option's cluster_ids. Alternative options
+ * (overriding a silent assumption) are ignored: no implementation does them, so they say nothing
+ * about which existing clusters survive.
  */
-export function activeClusterIds(questions: Question[], answers: Record<string, string>): Set<string> | null {
+export function activeClusterIds(
+  questions: Question[],
+  answers: Record<string, string>,
+  excludeQuestionId?: string,
+): Set<string> | null {
   let active: Set<string> | null = null;
-  for (const q of ambiguityQuestions(questions)) {
+  for (const q of answerableQuestions(questions)) {
+    if (q.id === excludeQuestionId) continue;
     const optId = answers[q.id];
     if (!optId) continue;
     const opt = q.options.find((o) => o.id === optId);
-    if (!opt) continue;
+    if (!opt || opt.is_alternative) continue;
     const ids = new Set(opt.cluster_ids);
     const prev: Set<string> | null = active;
     active = prev === null ? ids : new Set([...prev].filter((id: string) => ids.has(id)));
@@ -59,15 +75,41 @@ export function activeClusterIds(questions: Question[], answers: Record<string, 
   return active;
 }
 
-export function allAmbiguitiesAnswered(questions: Question[], answers: Record<string, string>): boolean {
-  const amb = ambiguityQuestions(questions);
-  return amb.length > 0 && amb.every((q) => !!answers[q.id] && q.options.some((o) => o.id === answers[q.id]));
+/**
+ * Is this option achievable together with the user's answers to the *other* questions?
+ * Alternatives are always compatible; otherwise its clusters must intersect the clusters still alive.
+ */
+export function optionCompatible(
+  questions: Question[],
+  answers: Record<string, string>,
+  q: Question,
+  opt: QuestionOption,
+): boolean {
+  if (opt.is_alternative) return true;
+  const alive = activeClusterIds(questions, answers, q.id);
+  if (alive === null) return true;
+  return opt.cluster_ids.some((id) => alive.has(id));
 }
 
-/** Number of implementations whose cluster backs this option. */
+export function allAnswered(questions: Question[], answers: Record<string, string>): boolean {
+  const qs = answerableQuestions(questions);
+  return qs.length > 0 && qs.every((q) => !!answers[q.id] && q.options.some((o) => o.id === answers[q.id]));
+}
+
+/** @deprecated kept for compatibility; same as allAnswered (ambiguities + assumptions). */
+export const allAmbiguitiesAnswered = allAnswered;
+
+/** Number of implementations whose cluster backs these cluster ids. */
 export function optionImplCount(clusters: Cluster[], clusterIds: string[]): number {
   const set = new Set(clusterIds);
   return clusters.filter((c) => set.has(c.id)).reduce((acc, c) => acc + c.size, 0);
+}
+
+/** Implementations choosing an option: the server's impl_count when present, else derived from clusters. */
+export function optionCount(clusters: Cluster[], opt: QuestionOption): number {
+  if (typeof opt.impl_count === "number") return opt.impl_count;
+  if (opt.is_alternative) return 0;
+  return optionImplCount(clusters, opt.cluster_ids);
 }
 
 /** Executed implementations (the denominator used for cluster shares). */
@@ -79,7 +121,8 @@ export function executedCount(impls: Implementation[]): number {
 export function answersFromRun(run: Run): Record<string, string> {
   const out: Record<string, string> = {};
   for (const q of run.questions) if (q.answer_option_id) out[q.id] = q.answer_option_id;
-  if (run.resolution) Object.assign(out, run.resolution.answers);
+  if (run.resolution)
+    for (const [k, v] of Object.entries(run.resolution.answers)) if (typeof v === "string" && v) out[k] = v;
   return out;
 }
 

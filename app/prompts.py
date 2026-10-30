@@ -74,13 +74,16 @@ Return an empty list if nothing important is left implicit. Reply with JSON only
 {"assumptions": [{"question": str, "why": str, "consensus_label": str, "alternative_label": str,
                   "input_ids": [str], "alternative_example": str}]}"""
 
-CLARIFY_SYSTEM = """You rewrite a function spec so it is unambiguous, given the product owner's decisions.
-You also get the implementation whose behaviour the owner chose and executed examples of that behaviour
-(input -> output; "raises" means it raises an exception). The clarified spec MUST be consistent with every
-example: describe the chosen behaviour precisely in plain English (rounding rule, who gets leftovers,
-inclusive/exclusive bounds, what happens on invalid input...), with one or two tiny examples taken from the
-list. Keep the original wording and intent. Never mention code, implementations or clusters.
-Keep it under 160 words. Reply with JSON only: {"clarified_spec": str, "decisions": [str]}"""
+CLARIFY_SYSTEM = """You rewrite a function spec so it is unambiguous on the points the product owner decided.
+Input: the original spec, the owner's decisions (question -> chosen answer), and executed examples of the
+chosen behaviour on exactly the inputs those decisions were about ("raises" means an exception).
+Rules:
+- Keep the original wording; add one precise sentence per decision, consistent with its examples.
+- Encode ONLY the decisions. Do not describe incidental details nobody decided (exception class names,
+  validation of types, behaviour on inputs not mentioned, implementation steps or algorithms).
+- Include at most two tiny examples, taken from the list. Never mention code, implementations or clusters.
+- Keep it under 110 words.
+Reply with JSON only: {"clarified_spec": str, "decisions": [str]}"""
 
 
 def signature_stub(sig: dict[str, Any]) -> str:

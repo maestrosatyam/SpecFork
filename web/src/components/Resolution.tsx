@@ -6,7 +6,7 @@ import { formatPct } from "../lib/format";
 import type { Convergence, Run } from "../types";
 import { CodeBlock, CopyButton } from "./CodeBlock";
 import { CountUpPct } from "./CountUp";
-import { IconArrowRight, IconCheck, IconCode, IconDownload, IconRefresh, IconX } from "./Icons";
+import { IconAlert, IconArrowRight, IconCheck, IconCode, IconDownload, IconRefresh, IconX } from "./Icons";
 
 export function SpecDiff({ before, after }: { before: string; after: string }) {
   const segs = useMemo(() => wordDiff(before, after), [before, after]);
@@ -317,6 +317,16 @@ export function ResolutionView({
             </span>
             <CopyButton text={r.clarified_spec} label="Copy spec" />
           </div>
+          {!!r.unlocked_input_ids?.length && (
+            <p className="mt-4 flex items-start gap-2 rounded-xl border border-warn/25 bg-warn/[0.06] px-3.5 py-2.5 text-[14px] leading-snug text-fog-300">
+              <IconAlert size={16} className="mt-0.5 shrink-0 text-warn" />
+              <span>
+                {r.unlocked_input_ids.length} case{r.unlocked_input_ids.length === 1 ? "" : "s"} left unlocked because you
+                overrode a silent assumption. No implementation produced the new behaviour yet, so there is no executed
+                expected value to lock.
+              </span>
+            </p>
+          )}
           <h3 className="eyebrow mt-7">Decisions</h3>
           <ul className="mt-3 space-y-2.5">
             {r.decisions.map((d, i) => (

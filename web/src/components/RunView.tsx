@@ -4,6 +4,8 @@ import { ApiError, type Api } from "../api";
 import {
   activeClusterIds,
   ambiguityQuestions,
+  answerableQuestions,
+  assumptionQuestions,
   answersFromRun,
   clusterStyles,
 } from "../lib/clusters";
@@ -13,7 +15,7 @@ import type { Implementation, Run, RunStatus } from "../types";
 import { IconAlert, IconArrowRight, IconInfo, IconTerminal } from "./Icons";
 import { ClusterLegend, GridStatusLegend, ImplGrid, type Focus } from "./ImplGrid";
 import { ImplDrawer } from "./ImplDrawer";
-import { ClusterBar, LikelyBugs, LockBar, MeaningsHeader, QuestionCard } from "./Meanings";
+import { AssumptionsIntro, ClusterBar, LikelyBugs, LockBar, MeaningsHeader, QuestionCard } from "./Meanings";
 import { LiveLog, Stepper } from "./Pipeline";
 import { ResolutionView } from "./Resolution";
 import { TraceDrawer, TraceSummary } from "./Trace";
@@ -134,7 +136,7 @@ export function RunView({
     setLockBusy(true);
     setLockErr(null);
     try {
-      const amb = Object.fromEntries(ambiguityQuestions(run.questions).map((q) => [q.id, answers[q.id]]));
+      const amb = Object.fromEntries(answerableQuestions(run.questions).map((q) => [q.id, answers[q.id]]));
       const next = await api.postAnswers(run.id, amb);
       follow(next);
     } catch (e) {
@@ -179,7 +181,9 @@ export function RunView({
 
   // The live server rejects answers/converge on recorded sample runs (409); mock mode lets you click through.
   const recorded = run.is_sample && api.mode === "live";
-  const amb = ambiguityQuestions(run.questions);
+  const amb = answerableQuestions(run.questions);
+  const ambOnly = ambiguityQuestions(run.questions);
+  const assumptions = assumptionQuestions(run.questions);
   const answeredCount = amb.filter((q) => answers[q.id]).length;
   const showMeanings = run.clusters.length > 0 && (run.questions.length > 0 || run.status !== "running");
   const executed = run.implementations.filter((i) => i.status === "executed").length;
@@ -294,13 +298,29 @@ export function RunView({
                     <ClusterBar clusters={run.clusters} styles={styles} focus={focus} onHover={setHover} />
                   </div>
                 </section>
-                {amb.map((q, i) => (
+                {ambOnly.map((q, i) => (
                   <QuestionCard
                     key={q.id}
                     run={run}
                     q={q}
                     idx={i}
                     answer={answers[q.id]}
+                    answers={answers}
+                    readOnly={locked}
+                    styles={styles}
+                    onAnswer={(opt) => setAnswers((a) => ({ ...a, [q.id]: opt }))}
+                    onHover={setHover}
+                  />
+                ))}
+                {assumptions.length > 0 && <AssumptionsIntro count={assumptions.length} />}
+                {assumptions.map((q, i) => (
+                  <QuestionCard
+                    key={q.id}
+                    run={run}
+                    q={q}
+                    idx={i}
+                    answer={answers[q.id]}
+                    answers={answers}
                     readOnly={locked}
                     styles={styles}
                     onAnswer={(opt) => setAnswers((a) => ({ ...a, [q.id]: opt }))}

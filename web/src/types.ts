@@ -51,14 +51,21 @@ export type QuestionOption = {
   label: string;
   cluster_ids: string[];
   examples: { input_id: string; value_repr: string }[];
+  impl_count?: number; // implementations choosing this option
+  /** Assumption questions: the "change it" option. No implementation does this; cluster_ids is empty. */
+  is_alternative?: boolean;
+  /** Model-written example for an alternative, e.g. "parse('03/04/2025') -> '2025-04-03'". NOT executed. */
+  note?: string;
 };
 
 export type Question = {
   id: string;
   text: string;
   why: string;
-  kind: "ambiguity" | "likely_bug";
-  witness_input_ids: string[];
+  kind: "ambiguity" | "likely_bug" | "assumption";
+  witness_input_ids: string[]; // may be empty for assumptions
+  affected_input_ids?: string[]; // assumption: inputs whose expected value depends on it
+  agree_count?: number; // assumption: implementations sharing the consensus behaviour
   options: QuestionOption[];
   answer_option_id?: string;
 };
@@ -100,6 +107,7 @@ export type Resolution = {
   locked_cases: { input_id: string; args: Record<string, unknown>; expected_repr: string }[];
   agreement_before: number;
   agreement_before_counts?: [number, number]; // optional extra: [matched, total]
+  unlocked_input_ids?: string[]; // cases dropped from locked tests because an assumption was overridden
   convergence?: Convergence;
 };
 

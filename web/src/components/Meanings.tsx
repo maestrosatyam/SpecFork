@@ -1,10 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import type { ClusterStyle } from "../lib/clusters";
-import { ambiguityQuestions, likelyBugQuestions, optionImplCount } from "../lib/clusters";
+import {
+  ambiguityQuestions,
+  answerableQuestions,
+  assumptionQuestions,
+  likelyBugQuestions,
+  optionCompatible,
+  optionCount,
+} from "../lib/clusters";
 import { formatCall, formatPct, isErrorRepr } from "../lib/format";
 import type { Cluster, Question, QuestionOption, Run } from "../types";
-import { IconBug, IconCheck, IconLock } from "./Icons";
+import { IconAlert, IconBug, IconCheck, IconLock } from "./Icons";
 import type { Focus } from "./ImplGrid";
 import { ClusterSwatch } from "./ImplDrawer";
 
@@ -107,6 +114,7 @@ function OptionCard({
   readOnly,
   styles,
   total,
+  compatible,
   onSelect,
   onHover,
 }: {
@@ -117,20 +125,27 @@ function OptionCard({
   readOnly: boolean;
   styles: Record<string, ClusterStyle>;
   total: number;
+  compatible: boolean;
   onSelect: () => void;
   onHover: (id: string | null) => void;
 }) {
-  const count = optionImplCount(run.clusters, opt.cluster_ids);
+  const count = optionCount(run.clusters, opt);
   const share = total ? count / total : 0;
+  const assumption = q.kind === "assumption";
+  const alt = !!opt.is_alternative;
+  const incompatibleMsg = "No implementation does this together with your other answers";
   return (
     <label
       className={`group relative flex h-full cursor-pointer flex-col rounded-2xl border p-4 transition-[border-color,background-color,box-shadow,opacity] duration-200 ${
         selected
           ? "border-fog-100/80 bg-white/[0.07] shadow-[0_0_0_1px_rgba(231,236,245,0.5),0_12px_30px_-16px_rgba(165,180,252,0.5)]"
           : "border-white/10 bg-white/[0.02] hover:border-white/25 hover:bg-white/[0.04]"
-      } ${readOnly && !selected ? "opacity-45" : ""} ${readOnly ? "cursor-default" : ""} has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent`}
+      } ${readOnly && !selected ? "opacity-45" : ""} ${!readOnly && !selected && !compatible ? "opacity-55" : ""} ${
+        alt && !selected ? "border-dashed" : ""
+      } ${readOnly ? "cursor-default" : ""} has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent`}
       onMouseEnter={() => opt.cluster_ids.length === 1 && onHover(opt.cluster_ids[0])}
       onMouseLeave={() => onHover(null)}
+      title={!compatible ? incompatibleMsg : undefined}
     >
       <input
         type="radio"
@@ -150,13 +165,44 @@ function OptionCard({
         >
           {selected && <IconCheck size={12} strokeWidth={3} />}
         </span>
-        <span className="text-[16px] font-semibold leading-snug text-fog-50">{opt.label}</span>
+        <span className="text-[16px] font-semibold leading-snug text-fog-50">
+          {assumption && (
+            <span className={`mr-1.5 font-display text-[13px] font-bold uppercase tracking-wider ${alt ? "text-warn" : "text-add"}`}>
+              {alt ? "Change to:" : "Keep:"}
+            </span>
+          )}
+          {opt.label}
+        </span>
       </div>
-      <div className="mt-3 space-y-1 rounded-xl bg-ink-950/60 px-3 py-2.5">
-        {opt.examples.map((ex) => (
-          <Witness key={ex.input_id} run={run} inputId={ex.input_id} value={ex.value_repr} />
-        ))}
-      </div>
+      {alt ? (
+        <div className="mt-3 rounded-xl border border-dashed border-warn/30 bg-warn/[0.04] px-3 py-2.5">
+          <div className="mb-1 text-[11.5px] font-semibold uppercase tracking-wider text-warn/90">Proposed, not executed</div>
+          {opt.note ? (
+            <div className="mono break-words text-[13.5px] leading-relaxed text-fog-200">{opt.note}</div>
+          ) : (
+            <div className="text-[13.5px] text-fog-400">No example given.</div>
+          )}
+        </div>
+      ) : opt.examples.length > 0 ? (
+        <div className="mt-3 space-y-1 rounded-xl bg-ink-950/60 px-3 py-2.5">
+          {opt.examples.map((ex) => (
+            <Witness key={ex.input_id} run={run} inputId={ex.input_id} value={ex.value_repr} />
+          ))}
+        </div>
+      ) : assumption ? (
+        <p className="mt-3 text-[13.5px] text-fog-400">What the implementations already do.</p>
+      ) : null}
+      {!compatible && !readOnly && (
+        <p className="mt-2.5 flex items-start gap-1.5 text-[13px] leading-snug text-warn">
+          <IconAlert size={14} className="mt-0.5 shrink-0" />
+          {incompatibleMsg}
+        </p>
+      )}
+      {alt ? (
+        <div className="mt-auto pt-3.5 text-[13.5px] text-fog-400">
+          No implementation does this yet. Locked tests will skip the affected cases.
+        </div>
+      ) : (
       <div className="mt-auto pt-3.5">
         <div className="flex items-center justify-between gap-2 text-[13.5px]">
           <span className="flex items-center gap-1.5">
@@ -180,6 +226,7 @@ function OptionCard({
           />
         </div>
       </div>
+      )}
     </label>
   );
 }
@@ -189,6 +236,7 @@ export function QuestionCard({
   q,
   idx,
   answer,
+  answers,
   readOnly,
   styles,
   onAnswer,
@@ -198,12 +246,15 @@ export function QuestionCard({
   q: Question;
   idx: number;
   answer?: string;
+  /** All current selections, used for compatibility hints. */
+  answers: Record<string, string>;
   readOnly: boolean;
   styles: Record<string, ClusterStyle>;
   onAnswer: (optId: string) => void;
   onHover: (id: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const assumption = q.kind === "assumption";
   const total = run.implementations.length;
   const cols = q.options.length >= 3 ? "lg:grid-cols-3" : "md:grid-cols-2";
   const chosen = q.options.find((o) => o.id === answer);
@@ -222,9 +273,15 @@ export function QuestionCard({
             answer ? "bg-fog-100 text-ink-900" : "bg-white/[0.07] text-fog-200"
           }`}
         >
-          {answer ? <IconCheck size={17} strokeWidth={2.6} /> : `Q${idx + 1}`}
+          {answer ? <IconCheck size={17} strokeWidth={2.6} /> : `${assumption ? "A" : "Q"}${idx + 1}`}
         </span>
         <div className="min-w-0">
+          {assumption && typeof q.agree_count === "number" && (
+            <span className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-[12.5px] font-semibold text-fog-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-add" aria-hidden />
+              {q.agree_count} of {total} implementations assumed this
+            </span>
+          )}
           <h3 id={`q-${q.id}-text`} className="font-display text-[21px] font-semibold leading-snug text-fog-50 sm:text-[23px]">
             {q.text}
           </h3>
@@ -238,10 +295,11 @@ export function QuestionCard({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-fog-100/30 bg-white/[0.04] px-4 py-3 sm:ml-[52px]">
           <span className="flex items-center gap-2.5 text-[16px] font-semibold text-fog-50">
             <IconCheck size={16} strokeWidth={2.6} className="text-add" />
+            {assumption && <span className={chosen!.is_alternative ? "text-warn" : "text-add"}>{chosen!.is_alternative ? "Change to:" : "Keep:"}</span>}
             {chosen!.label}
           </span>
           <span className="flex items-center gap-3 text-[13.5px] text-fog-400">
-            chosen by {optionImplCount(run.clusters, chosen!.cluster_ids)} of {total}
+            {chosen!.is_alternative ? "proposed, not executed" : `chosen by ${optionCount(run.clusters, chosen!)} of ${total}`}
             <button type="button" className="btn btn-quiet py-1 text-[13px]" onClick={() => setExpanded(true)} aria-expanded={false}>
               Show all {q.options.length} options
             </button>
@@ -259,6 +317,7 @@ export function QuestionCard({
             readOnly={readOnly}
             styles={styles}
             total={total}
+            compatible={optionCompatible(run.questions, answers, q, opt)}
             onSelect={() => onAnswer(opt.id)}
             onHover={onHover}
           />
@@ -290,7 +349,7 @@ export function LikelyBugs({ run, styles }: { run: Run; styles: Record<string, C
                     {o.cluster_ids.map((cid) => (
                       <ClusterSwatch key={cid} style={styles[cid]} size={10} />
                     ))}
-                    {o.label} · {optionImplCount(run.clusters, o.cluster_ids)} impl.
+                    {o.label} · {optionCount(run.clusters, o)} impl.
                   </div>
                   {o.examples.map((ex) => (
                     <Witness key={ex.input_id} run={run} inputId={ex.input_id} value={ex.value_repr} />
@@ -309,24 +368,58 @@ export function MeaningsHeader({ run }: { run: Run }) {
   const k = run.clusters.filter((c) => c.kind === "behavior").length;
   const crash = run.clusters.filter((c) => c.kind === "crash").length;
   const q = ambiguityQuestions(run.questions).length;
+  const a = assumptionQuestions(run.questions).length;
   const executed = run.implementations.filter((i) => i.status === "executed").length;
+  const consensusOnAssumptions = k <= 1 && a > 0;
+  const toSettle = answerableQuestions(run.questions).length;
   return (
     <div>
       <p className="eyebrow">Result</p>
       <h2 className="mt-1 font-display text-[32px] font-bold leading-tight tracking-[-0.02em] text-fog-50 sm:text-[40px]">
-        Your spec has <span className="text-accent-strong">{k}</span> meaning{k === 1 ? "" : "s"}.
+        {consensusOnAssumptions ? (
+          <>
+            Every implementation agrees,{" "}
+            <span className="text-accent-strong">but on assumptions you never stated.</span>
+          </>
+        ) : (
+          <>
+            Your spec has <span className="text-accent-strong">{k}</span> meaning{k === 1 ? "" : "s"}.
+          </>
+        )}
       </h2>
       <p className="mt-2 max-w-[860px] text-[16px] leading-relaxed text-fog-300">
         {executed} implementations ran on {run.inputs.length} probe inputs and split into {k} distinct behaviour
         {k === 1 ? "" : "s"}
         {crash ? ` (plus ${crash} that crash${crash === 1 ? "es" : ""})` : ""}.{" "}
-        {q > 0 ? (
+        {toSettle > 0 ? (
           <>
-            {q === 1 ? "One question settles" : `${q} questions settle`} it. Pick the behaviour you meant.
+            {q > 0 && <>{q === 1 ? "One question" : `${q} questions`} about where they disagree</>}
+            {q > 0 && a > 0 && " and "}
+            {a > 0 && (
+              <>
+                {q > 0 ? (a === 1 ? "one silent assumption" : `${a} silent assumptions`) : a === 1 ? "One silent assumption" : `${a} silent assumptions`} they all made
+              </>
+            )}
+            {q + a === 1 ? " settles it." : " settle it."}
           </>
         ) : (
           "No ambiguities found: every implementation agrees."
         )}
+      </p>
+    </div>
+  );
+}
+
+export function AssumptionsIntro({ count }: { count: number }) {
+  return (
+    <div className="pt-2">
+      <p className="eyebrow">Silent assumptions</p>
+      <h2 className="mt-1 font-display text-[24px] font-semibold text-fog-50 sm:text-[28px]">
+        {count === 1 ? "One decision nobody asked you about" : `${count} decisions nobody asked you about`}
+      </h2>
+      <p className="mt-1.5 max-w-[860px] text-[15.5px] leading-relaxed text-fog-400">
+        Every implementation agreed here, but your spec never said so. Keep the assumption, or change it. A change
+        is written into the clarified spec and the affected cases are left out of the locked tests.
       </p>
     </div>
   );

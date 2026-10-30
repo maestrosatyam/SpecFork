@@ -555,13 +555,14 @@ class SpecFork:
             if decisions:
                 try:
                     sig_name = run["signature"]["name"]
-                    witness_ids = [w for q in run["questions"] for w in q["witness_input_ids"]]
-                    ordered = witness_ids + [c["input_id"] for c in locked if c["input_id"] not in witness_ids]
+                    witness_ids = [w for q in run["questions"] if q.get("answer_option_id")
+                                   and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])
+                                   for w in q["witness_input_ids"]]
                     by_id = {c["input_id"]: c for c in locked}
                     examples = [f"{sig_name}(**{json.dumps(by_id[i]['args'])}) -> {by_id[i]['expected_repr']}"
-                                for i in dict.fromkeys(ordered) if i in by_id][:16]
+                                for i in dict.fromkeys(witness_ids) if i in by_id][:10]
                     raw = await self._json_call(run, "clarify", prompts.CLARIFY_SYSTEM,
-                                                prompts.clarify_user(run["spec"], decisions, chosen_impl.get("code") or "", examples),
+                                                prompts.clarify_user(run["spec"], decisions, "", examples),
                                                 model=run["settings"]["deep_model"], thinking=True, max_tokens=10000, temperature=0.3,
                                                 template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
                     clarified = str(raw.get("clarified_spec") or "").strip() or clarified

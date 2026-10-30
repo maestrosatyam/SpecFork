@@ -23,7 +23,9 @@ function stageDetail(run: Run, id: string): string | null {
       return run.clusters.length ? `${run.clusters.length} clusters` : null;
     case "explain": {
       const q = run.questions.filter((x) => x.kind === "ambiguity").length;
-      return run.questions.length ? `${q} question${q === 1 ? "" : "s"}` : null;
+      const a = run.questions.filter((x) => x.kind === "assumption").length;
+      if (!run.questions.length) return null;
+      return `${q} question${q === 1 ? "" : "s"}${a ? ` · ${a} assumption${a === 1 ? "" : "s"}` : ""}`;
     }
   }
   return null;

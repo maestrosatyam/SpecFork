@@ -49,6 +49,7 @@ export const INPUTS: ProbeInput[] = [
   { id: "in6", args: { total: 19.99, n: 1 }, source: "fuzz" },
   { id: "in7", args: { total: 1234.56, n: 7 }, source: "fuzz" },
   { id: "in8", args: { total: 100.0, n: -2 }, source: "fuzz", note: "Negative head-count" },
+  { id: "in9", args: { total: -30.0, n: 3 }, source: "model", note: "Negative total (a refund)" },
 ];
 
 const ok = (v: string): Outcome => ({ ok: true, value_repr: v });
@@ -70,6 +71,7 @@ const BEHAVIOUR: Record<BehaviourKey, Record<string, Outcome>> = {
     in6: ok("[19.99]"),
     in7: ok(SEVEN_FIRST),
     in8: err("ValueError", "n must be positive"),
+    in9: ok("[-10.0, -10.0, -10.0]"),
   },
   B: {
     in1: ok("[33.33, 33.33, 33.33]"),
@@ -80,6 +82,7 @@ const BEHAVIOUR: Record<BehaviourKey, Record<string, Outcome>> = {
     in6: ok("[19.99]"),
     in7: ok(SEVEN_DOWN),
     in8: err("ValueError", "n must be at least 1"),
+    in9: ok("[-10.0, -10.0, -10.0]"),
   },
   C: {
     in1: ok("[33.34, 33.34, 33.34]"),
@@ -90,6 +93,7 @@ const BEHAVIOUR: Record<BehaviourKey, Record<string, Outcome>> = {
     in6: ok("[19.99]"),
     in7: ok(SEVEN_UP),
     in8: err("ValueError", "n must be positive"),
+    in9: ok("[-10.0, -10.0, -10.0]"),
   },
   D: {
     in1: ok("[33.34, 33.33, 33.33]"),
@@ -100,6 +104,7 @@ const BEHAVIOUR: Record<BehaviourKey, Record<string, Outcome>> = {
     in6: ok("[19.99]"),
     in7: ok(SEVEN_FIRST),
     in8: ok("[]"),
+    in9: ok("[-10.0, -10.0, -10.0]"),
   },
   E: Object.fromEntries(
     INPUTS.map((i) => [i.id, err("TypeError", "'float' object cannot be interpreted as an integer")]),
@@ -373,6 +378,7 @@ export function buildBillRun(opts: BuildOpts): Run {
     })
     .filter((c) => c.size > 0);
   const has = (id: string) => clusters.some((c) => c.id === id);
+  const optionImplCount = (ids: string[]) => clusters.filter((c) => ids.includes(c.id)).reduce((a, c) => a + c.size, 0);
   const keep = (ids: string[]) => ids.filter(has);
 
   const questions: Question[] = [
@@ -459,6 +465,38 @@ export function buildBillRun(opts: BuildOpts): Run {
     });
   }
 
+  const consensus = keep(["cA", "cB", "cC", "cD"]);
+  questions.push({
+    id: "a0",
+    kind: "assumption",
+    text: "Can the total be negative, for example a refund?",
+    why: "Every implementation accepted split_bill(-30.0, 3) and split the refund like a bill. Your spec never says whether a negative total is valid input or a caller error.",
+    witness_input_ids: ["in9"],
+    affected_input_ids: ["in9"],
+    agree_count: optionImplCount(consensus),
+    options: [
+      {
+        id: "a0keep",
+        label: "Yes. Split refunds exactly like bills",
+        cluster_ids: consensus,
+        impl_count: optionImplCount(consensus),
+        examples: [{ input_id: "in9", value_repr: "[-10.0, -10.0, -10.0]" }],
+      },
+      {
+        id: "a0alt",
+        label: "No. A negative total is invalid: raise ValueError",
+        cluster_ids: [],
+        impl_count: 0,
+        examples: [],
+        is_alternative: true,
+        note: "split_bill(-30.0, 3) -> raises ValueError",
+      },
+    ],
+  });
+  // Server sends impl_count on every option.
+  for (const q of questions)
+    for (const o of q.options) if (o.impl_count === undefined) o.impl_count = optionImplCount(o.cluster_ids);
+
   // Trace: frame (deep, thinking) → N implement calls (fast) → explain (deep, thinking).
   const trace: CallRecord[] = [];
   let t = created + 0.2;
@@ -484,13 +522,13 @@ export function buildBillRun(opts: BuildOpts): Run {
   const log: Run["log"] = [
     { t: created, stage: "frame", msg: `Run created · ${n} samples requested` },
     { t: created + 0.2, stage: "frame", msg: "Nemotron 3 Ultra is framing the spec (thinking on)…" },
-    { t: trace[0].started_at + trace[0].latency_s, stage: "frame", msg: "Signature: split_bill(total: float, n: int) -> list[float] · 8 probe inputs (4 model, 4 fuzz)" },
+    { t: trace[0].started_at + trace[0].latency_s, stage: "frame", msg: "Signature: split_bill(total: float, n: int) -> list[float] · 9 probe inputs (5 model, 4 fuzz)" },
     { t: trace[0].started_at + trace[0].latency_s + 0.1, stage: "fanout", msg: `Fanning out ${n} independent implementations on Nemotron 3.5 Lightning` },
     { t: fanEnd, stage: "fanout", msg: `${n - alloc.R} generated · ${alloc.R} rejected by static safety check` },
     { t: fanEnd + 0.1, stage: "execute", msg: `Executing ${executed} implementations × ${INPUTS.length} inputs in the sandbox` },
     { t: fanEnd + 1.2, stage: "cluster", msg: `${clusters.length} behaviour clusters (${clusters.filter((c) => c.kind === "crash").length} crash)` },
     { t: fanEnd + 1.6, stage: "explain", msg: "Nemotron 3 Ultra is turning disagreements into questions…" },
-    { t: end, stage: "explain", msg: `${questions.filter((q) => q.kind === "ambiguity").length} ambiguities · ${questions.filter((q) => q.kind === "likely_bug").length} likely bug` },
+    { t: end, stage: "explain", msg: `${questions.filter((q) => q.kind === "ambiguity").length} ambiguities · ${questions.filter((q) => q.kind === "assumption").length} silent assumption · ${questions.filter((q) => q.kind === "likely_bug").length} likely bug` },
   ];
 
   const run: Run = {
@@ -620,6 +658,8 @@ export function buildTests(run: Run, cases: Resolution["locked_cases"], spec: st
 export function buildResolution(run: Run, answers: Record<string, string>): { resolution: Resolution; trace: CallRecord } {
   const q1 = answers.q1 ?? "q1_first";
   const q2 = answers.q2 ?? "q2_raise";
+  const a0 = answers.a0 ?? "a0keep";
+  const overrides = a0 === "a0alt" ? ["in9"] : [];
   const opt = (qid: string, oid: string) => run.questions.find((q) => q.id === qid)?.options.find((o) => o.id === oid);
   const set1 = new Set(opt("q1", q1)?.cluster_ids ?? []);
   const surviving = (opt("q2", q2)?.cluster_ids ?? []).filter((c) => set1.has(c));
@@ -631,16 +671,24 @@ export function buildResolution(run: Run, answers: Record<string, string>): { re
   const valueKey: BehaviourKey = q1 === "q1_down" ? "B" : q1 === "q1_up" ? "C" : "A";
   const expected = (inputId: string): string => {
     if (inputId === "in2" || inputId === "in8") return q2 === "q2_empty" ? "[]" : "ValueError";
+    if (inputId === "in9") return "[-10.0, -10.0, -10.0]";
     return BEHAVIOUR[valueKey][inputId].value_repr;
   };
-  const locked = run.inputs.map((i) => ({ input_id: i.id, args: i.args, expected_repr: expected(i.id) }));
+  const locked = run.inputs
+    .filter((i) => !overrides.includes(i.id))
+    .map((i) => ({ input_id: i.id, args: i.args, expected_repr: expected(i.id) }));
   const matches = run.implementations.filter(
     (impl) => impl.outcomes && locked.every((c) => impl.outcomes![c.input_id]?.value_repr === c.expected_repr),
   ).length;
 
-  const clarified = `${BILL_SPEC} ${Q1_SPEC[q1]} ${Q2_SPEC[q2]} Return a list of N floats, one per person, in order.`;
-  const decisions = [Q1_DECISION[q1], Q2_DECISION[q2], "The result has N floats in person order, each with at most 2 decimal places."];
-  const refCode =
+  const a0Spec = a0 === "a0alt" ? "A negative total is invalid: raise ValueError." : "A negative total (a refund) is split the same way.";
+  const a0Decision =
+    a0 === "a0alt"
+      ? "Negative totals raise ValueError. This overrides what every implementation assumed."
+      : "Negative totals (refunds) are split like any other bill.";
+  const clarified = `${BILL_SPEC} ${Q1_SPEC[q1]} ${Q2_SPEC[q2]} ${a0Spec} Return a list of N floats, one per person, in order.`;
+  const decisions = [Q1_DECISION[q1], Q2_DECISION[q2], a0Decision, "The result has N floats in person order, each with at most 2 decimal places."];
+  const baseRef =
     q1 === "q1_first" && q2 === "q2_raise"
       ? CODE.A[0]
       : q1 === "q1_first"
@@ -649,6 +697,10 @@ export function buildResolution(run: Run, answers: Record<string, string>): { re
             /raise ValueError\(("n must be (?:positive|at least 1)")\)/,
             q2 === "q2_empty" ? "return []" : "raise ValueError($1)",
           );
+  const refCode =
+    a0 === "a0alt"
+      ? baseRef.replace(/(def split_bill[^\n]*\n(?: {4}"""[^\n]*\n)?)/, '$1    if total < 0:\n        raise ValueError("total must not be negative")\n')
+      : baseRef;
 
   const r = rng(99);
   const now = Date.now() / 1000;
@@ -663,6 +715,8 @@ export function buildResolution(run: Run, answers: Record<string, string>): { re
       reference_code: refCode,
       locked_cases: locked,
       agreement_before: run.implementations.length ? matches / run.implementations.length : 0,
+      agreement_before_counts: [matches, run.implementations.length],
+      unlocked_input_ids: overrides,
     },
     trace: makeTraceCall(r, "clarify: rewrite spec from answers", DEEP_MODEL, true, now, { pt: [1400, 1600], ct: [700, 900], lat: [3.8, 4.6] }, CLARIFY_REASONING),
   };
