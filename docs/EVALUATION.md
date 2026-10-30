@@ -1,5 +1,48 @@
 # Evaluation results
 
+## v0.2.0 (2026-10-30): six full runs after the refactor
+
+Every run used the same 32-spec benchmark and N=12 implementations per condition, live on Nebius Token Factory
+(NVIDIA Nemotron 3.5 Lightning and NVIDIA Nemotron 3 Ultra). Intervals are 95% percentile bootstrap over items.
+The raw JSON for each run is in [`docs/results/`](results/).
+
+| Run | SpecFork configuration | SpecFork (ambiguous) | B1 ask-first | B0 none | SpecFork questions on clear specs |
+|---|---|---|---|---|---|
+| v1 (pre-refactor, `eval-20261030-144500`) | original pipeline | 41.9% | 39.0% | 21.0% | 2.00 |
+| v2 (`v2-strict`) | strict assumptions (confidence ≥ 0.6, ≤ 2, witness required) | 21.8% | 38.6% | 24.0% | 0.83 |
+| v3 (`v3-mid`) | confidence ≥ 0.3, ≤ 3 | 30.1% | 44.4% | 21.6% | 1.00 |
+| v4 (`v4-defaults`) | restored defaults | 29.6% (15–46%) | 48.5% (31–66%) | 21.7% (9–36%) | 1.67 |
+| v5 (`v5-freetext`) | defaults; the simulated owner may answer in free text | 29.8% (16–45%) | 42.3% (28–58%) | 21.2% (9–35%) | 2.67 |
+| v6 (`v6-mixed`) | defaults + mixed fan-out (Nemotron 3.5 Lightning + Qwen3 30B) | **35.0%** (20–52%) | 46.0% (31–61%) | 19.9% (8–34%) | 2.33 |
+
+What this shows, plainly:
+- **SpecFork does not beat a well-prompted ask-first baseline on intent alignment.** After the refactor it
+  scored 22–35% against the baseline's 39–49%. The single pre-refactor run (41.9%) has not been reproduced. The
+  confidence intervals overlap with it, so part of the gap may be run-to-run noise, but we treat it as a
+  regression until shown otherwise. Both approaches beat no clarification (about 21%).
+- **Assumption calibration is a real trade-off.** Fewer questions on clear specs (2.0 → 0.83) came with lower
+  accuracy on ambiguous specs, because on this benchmark the owner's intent is often an unpopular convention that
+  only an assumption question surfaces. Defaults favour recall; `SPECFORK_ASSUMPTION_MIN_CONFIDENCE`,
+  `SPECFORK_MAX_ASSUMPTIONS` and `SPECFORK_ASSUMPTION_REQUIRES_WITNESS` turn on the strict mode. The review's
+  target (≤ 0.5 false-alarm questions with no alignment loss) is **not met**.
+- **Free-text answers work but did not move the metric.** The simulated owner used them in 4 of 26 items, and
+  the three items they were meant to fix (`moving_average`, `split_full_name`, `shift_length`) did not improve.
+- **Mixed-model fan-out was the best post-refactor configuration** (35.0% against 29.8% single-model, same
+  owner). That is one run, so treat it as a lead, not a result.
+- **Clear specs stay correct.** SpecFork keeps 92–100% alignment on the controls, but asks 1.7–2.7 unnecessary
+  questions per spec at default settings.
+- **What only SpecFork produces** is unchanged: an executed witness for every question, deterministic locked
+  tests, and a measured re-fork. The baseline produces none of these.
+
+Next steps are tracked in [ROADMAP.md](ROADMAP.md):
+- find the cause of the gap against v1 (prompt or JSON-mode differences in the simulated owner and framing calls);
+- run multi-seed runs with `--repeats`;
+- add a free-text condition that forces "Other" when no option matches.
+
+---
+
+## v0.1.0 (pre-refactor) report
+
 **Status: executed** on 2026-10-30, live against Nebius Token Factory (`nvidia/Nemotron-3_5-Lightning` and `nvidia/Nemotron-3-Ultra-550b-a55b`).
 Raw results: [`docs/results/eval-20261030-144500.json`](results/eval-20261030-144500.json). Reproduce with `make eval` (`evals/run_eval.py --n 12`).
 

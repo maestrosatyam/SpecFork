@@ -196,19 +196,19 @@ Design details: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 ## Results (honest summary)
 
 <!-- EVAL_SUMMARY -->
-A live benchmark on 26 ambiguous and 6 clear hand-written specs (N=12 implementations per condition, one
-run) measured intent alignment: the share of fresh implementations that match a hidden reference.
+A live benchmark measures intent alignment: the share of fresh implementations that match a hidden reference.
+It uses 26 ambiguous and 6 clear hand-written specs, with N=12 implementations per condition.
 
-| Condition | Intent alignment (ambiguous specs) |
-|---|---|
-| No clarification | 21.0% |
-| One ask-first prompt + rewrite | 39.0% |
-| SpecFork | 41.9% |
+| Condition (ambiguous specs) | v0.1.0 (1 run) | v0.2.0 (5 runs, range) |
+|---|---|---|
+| No clarification | 21.0% | 20–24% |
+| One ask-first prompt + rewrite | 39.0% | 39–49% |
+| SpecFork | 41.9% | 22–35% (best: mixed-model fan-out) |
 
-SpecFork ties a well-prompted ask-first baseline on alignment (the difference is within noise) and roughly
-doubles no clarification. What it adds is structural: an executed witness for every question, deterministic
-locked tests, and a measured re-fork. Details, per-item results and failure cases:
-[`docs/EVALUATION.md`](docs/EVALUATION.md).
+**SpecFork does not currently beat a well-prompted ask-first baseline on this metric**, and the v0.2.0 runs
+score below the single v0.1.0 run. The intervals overlap, but we treat it as a regression under investigation.
+What SpecFork adds is structural: an executed witness for every question, deterministic locked tests, and a
+measured re-fork. Full results, configurations and failure cases: [`docs/EVALUATION.md`](docs/EVALUATION.md).
 
 ## Security
 
