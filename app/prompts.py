@@ -12,6 +12,7 @@ Given a spec, produce:
    Use only these types: int, float, str, bool, None, list[...], dict[str, ...], Optional[...].
    Represent dates/times as ISO-8601 strings (e.g. "2024-02-29").
    IMPORTANT: never resolve ambiguity. Descriptions restate only what the spec says.
+   Use ONLY parameters the spec mentions or directly implies; never invent extra options (no tips, flags, modes).
 2. 14-18 probe inputs (keyword arguments as JSON) that a careful tester would try. Include typical
    cases AND the edge cases where reasonable developers might implement the spec differently:
    boundaries and ties, empty values, zero, rounding, case and whitespace, unicode, ordering,
