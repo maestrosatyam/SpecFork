@@ -5,7 +5,7 @@ PRESETS = [
         "id": "split_bill",
         "title": "Split the bill",
         "tagline": "Money that doesn't divide evenly",
-        "spec": "Split a restaurant bill evenly among n people. Return how much each person pays, rounded to cents.",
+        "spec": "Split a restaurant bill evenly among n people and return the list of amounts each person pays, rounded to cents.",
     },
     {
         "id": "business_days",

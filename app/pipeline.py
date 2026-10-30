@@ -8,6 +8,7 @@ Everything that decides (clustering, witnesses, tests, agreement) is determinist
 from __future__ import annotations
 
 import asyncio
+import os
 import hashlib
 import json
 import random
@@ -23,6 +24,7 @@ from .sandbox import check_code, exec_semaphore, run_function
 
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,40}$")
 MAX_INPUTS = 24
+FRAME_THINKING = os.environ.get("FRAME_THINKING", "0") == "1"
 
 
 class PipelineError(RuntimeError):
@@ -223,11 +225,14 @@ class SpecFork:
             run["trace"][-1]["reasoning_excerpt"] = res.reasoning[:600]
         return res
 
-    async def _json_call(self, run, purpose, system, user, *, model, thinking, max_tokens, temperature=0.3, retries=1):
+    async def _json_call(self, run, purpose, system, user, *, model, thinking, max_tokens, temperature=0.3, retries=1,
+                         template_kwargs=None, fallback_no_thinking=False):
         last: Exception | None = None
         for attempt in range(retries + 1):
+            think = thinking and not (fallback_no_thinking and attempt > 0)
             res = await self._chat(run, purpose, [{"role": "system", "content": system}, {"role": "user", "content": user}],
-                                   model=model, thinking=thinking, max_tokens=max_tokens, temperature=temperature)
+                                   model=model, thinking=think, max_tokens=max_tokens, temperature=temperature,
+                                   template_kwargs=template_kwargs if think else None)
             try:
                 return extract_json(res.content)
             except ValueError as e:
@@ -237,12 +242,22 @@ class SpecFork:
 
     # ---- stage 1
     async def frame(self, run: dict[str, Any]) -> None:
+        for attempt in range(2):
+            try:
+                return await self._frame_once(run)
+            except PipelineError as e:
+                if attempt == 1:
+                    raise
+                self._log(run, "frame", f"Framing output rejected ({e}); retrying")
+
+    async def _frame_once(self, run: dict[str, Any]) -> None:
         run["stage"] = "frame"
         self._log(run, "frame", f"Framing the spec with {run['settings']['fast_model']}")
         fixed = run.get("signature")
         system = prompts.FRAME_INPUTS_SYSTEM if fixed else prompts.FRAME_SYSTEM
         raw = await self._json_call(run, "frame", system, prompts.frame_user(run["spec"], fixed),
-                                    model=run["settings"]["fast_model"], thinking=True, max_tokens=6000, temperature=0.4)
+                                    model=run["settings"]["fast_model"], thinking=FRAME_THINKING, max_tokens=8000, temperature=0.4,
+                                    fallback_no_thinking=True)
         sig = validate_signature(fixed) if fixed else validate_signature(raw)
         model_inputs = validate_inputs(raw.get("inputs") or [], sig, "model")
         fz = validate_inputs(fuzz_inputs(sig, run["spec"]), sig, "fuzz")
@@ -312,7 +327,8 @@ class SpecFork:
                 impl["cluster_id"] = cr.impl_cluster[impl["id"]]
         run["clusters"] = cr.clusters
         rep = {c["id"]: ex[c["representative_impl_id"]] for c in cr.clusters}
-        axes = find_axes(cr.clusters, rep, ids)
+        cost = {i["id"]: len(json.dumps(i["args"])) for i in run["inputs"]}
+        axes = find_axes(cr.clusters, rep, ids, input_cost=cost)
         live = [c for c in cr.clusters if c["kind"] == "behavior"]
         self._log(run, "cluster", f"{len(ex)} implementations → {len(live)} distinct behaviours"
                                   f"{' + ' + str(len(cr.clusters) - len(live)) + ' crash cluster(s)' if len(cr.clusters) > len(live) else ''}; "
@@ -356,7 +372,8 @@ class SpecFork:
         try:
             raw = await self._json_call(run, "explain", prompts.EXPLAIN_SYSTEM,
                                         prompts.explain_user(run["spec"], run["signature"], axes_payload, clusters_payload),
-                                        model=run["settings"]["deep_model"], thinking=True, max_tokens=12000, temperature=0.6)
+                                        model=run["settings"]["deep_model"], thinking=True, max_tokens=16000, temperature=0.6,
+                                        template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
         except (LLMError, PipelineError) as e:
             self._log(run, "explain", f"Explainer unavailable ({str(e)[:80]}); using raw witness questions")
             raw = {"axes": []}
@@ -460,7 +477,14 @@ class SpecFork:
             clarified = run["spec"]
             if decisions:
                 try:
-                    raw = await self._json_call(run, "clarify", prompts.CLARIFY_SYSTEM, prompts.clarify_user(run["spec"], decisions),
+                    sig_name = run["signature"]["name"]
+                    witness_ids = [w for q in run["questions"] for w in q["witness_input_ids"]]
+                    ordered = witness_ids + [c["input_id"] for c in locked if c["input_id"] not in witness_ids]
+                    by_id = {c["input_id"]: c for c in locked}
+                    examples = [f"{sig_name}(**{json.dumps(by_id[i]['args'])}) -> {by_id[i]['expected_repr']}"
+                                for i in dict.fromkeys(ordered) if i in by_id][:16]
+                    raw = await self._json_call(run, "clarify", prompts.CLARIFY_SYSTEM,
+                                                prompts.clarify_user(run["spec"], decisions, chosen_impl.get("code") or "", examples),
                                                 model=run["settings"]["deep_model"], thinking=False, max_tokens=1500, temperature=0.3)
                     clarified = str(raw.get("clarified_spec") or "").strip() or clarified
                     if raw.get("decisions"):

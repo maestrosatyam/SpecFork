@@ -134,6 +134,7 @@ class NebiusClient:
         tool_choice: Any = None,
         response_format: dict[str, Any] | None = None,
         trace: list[CallRecord] | None = None,
+        template_kwargs: dict[str, Any] | None = None,
     ) -> Completion:
         if not self.configured:
             raise LLMError("NEBIUS_API_KEY is not configured")
@@ -142,7 +143,7 @@ class NebiusClient:
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
-            "chat_template_kwargs": {"enable_thinking": thinking},
+            "chat_template_kwargs": {"enable_thinking": thinking, **(template_kwargs or {})},
         }
         if seed is not None:
             body["seed"] = seed

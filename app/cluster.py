@@ -71,6 +71,7 @@ def find_axes(
     input_ids: list[str],
     max_axes: int = 6,
     max_witnesses_per_axis: int = 3,
+    input_cost: dict[str, float] | None = None,
 ) -> list[Axis]:
     """Find inputs on which clusters disagree, grouped by the cluster partition they induce.
 
@@ -95,9 +96,16 @@ def find_axes(
             masses = sorted((sum(size[cid] for cid in g) for g in partition), reverse=True)
             ax = Axis(partition=partition, weight=float(sum(masses[1:])))
             axes[partition] = ax
-        if len(ax.witness_input_ids) < max_witnesses_per_axis:
-            ax.witness_input_ids.append(inp)
-            ax.group_values[inp] = [(",".join(sorted(g)), v) for v, g in by_val.items()]
+        ax.witness_input_ids.append(inp)
+        ax.group_values[inp] = [(",".join(sorted(g)), v) for v, g in by_val.items()]
+    # Prefer the clearest witnesses: inputs where no behaviour raises, then the simplest inputs.
+    cost = input_cost or {}
+    for ax in axes.values():
+        ax.witness_input_ids.sort(key=lambda i: (sum(1 for _, v in ax.group_values[i] if v == "raises"),
+                                                 cost.get(i, 0.0), input_ids.index(i)))
+        keep = ax.witness_input_ids[:max_witnesses_per_axis]
+        ax.group_values = {i: ax.group_values[i] for i in keep}
+        ax.witness_input_ids = keep
     ranked = sorted(axes.values(), key=lambda a: (-a.weight, len(a.partition), a.witness_input_ids[0]))
     # Keep axes that add new distinctions: greedy cover of cluster pairs.
     chosen: list[Axis] = []

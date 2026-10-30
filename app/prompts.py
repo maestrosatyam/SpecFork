@@ -55,9 +55,12 @@ Reply with JSON only:
            "options": [{"group": str, "label": str}], "bug_groups": [str], "merge_into": str|null}]}"""
 
 CLARIFY_SYSTEM = """You rewrite a function spec so it is unambiguous, given the product owner's decisions.
-Keep the original wording and intent; add precise sentences that encode each decision (with a tiny
-example where it helps). Do not add requirements that were not decided. Keep it under 150 words.
-Reply with JSON only: {"clarified_spec": str, "decisions": [str]}"""
+You also get the implementation whose behaviour the owner chose and executed examples of that behaviour
+(input -> output; "raises" means it raises an exception). The clarified spec MUST be consistent with every
+example: describe the chosen behaviour precisely in plain English (rounding rule, who gets leftovers,
+inclusive/exclusive bounds, what happens on invalid input...), with one or two tiny examples taken from the
+list. Keep the original wording and intent. Never mention code, implementations or clusters.
+Keep it under 160 words. Reply with JSON only: {"clarified_spec": str, "decisions": [str]}"""
 
 
 def signature_stub(sig: dict[str, Any]) -> str:
@@ -89,5 +92,10 @@ def explain_user(spec: str, sig: dict[str, Any], axes_payload: list[dict[str, An
     )
 
 
-def clarify_user(spec: str, decisions: list[dict[str, str]]) -> str:
-    return f"Original spec:\n{spec.strip()}\n\nDecisions:\n{json.dumps(decisions, indent=1)}"
+def clarify_user(spec: str, decisions: list[dict[str, str]], chosen_code: str = "", examples: list[str] | None = None) -> str:
+    out = f"Original spec:\n{spec.strip()}\n\nDecisions:\n{json.dumps(decisions, indent=1)}"
+    if examples:
+        out += "\n\nExecuted examples of the chosen behaviour:\n" + "\n".join(examples)
+    if chosen_code:
+        out += f"\n\nChosen implementation (for your understanding only):\n```python\n{chosen_code[:2500]}\n```"
+    return out
