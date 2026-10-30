@@ -11,7 +11,7 @@ implementation. A final **re-fork** measures how many fresh, independent impleme
 what you meant.
 
 > Hackathon: Nebius × NVIDIA Global AI Hackathon 2026, track **Coding and Agentic Engineering**.
-> Live demo: _see the Devpost entry / `submission/DEVPOST_SUBMISSION.md`_ · License: MIT
+> **Live demo: https://specfork-ybzssouqyq-uc.a.run.app** (no login; 6 live runs / 10 min / visitor) · License: MIT
 
 ```
 "Split a restaurant bill evenly among n people. Return how much each person pays, rounded to cents."
