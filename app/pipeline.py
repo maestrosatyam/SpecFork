@@ -523,6 +523,8 @@ class SpecFork:
                                       "note": "Overrides what the implementations assumed."})
                     continue
                 chosen_sets.append(set(opt["cluster_ids"]))
+                if q["kind"] == "likely_bug":
+                    continue  # excludes the buggy behaviour, but is not a product decision
                 if not opt["examples"]:
                     decisions.append({"question": q["text"], "answer": opt["label"]})
                     continue
@@ -540,7 +542,7 @@ class SpecFork:
             ex = {i["id"]: i["outcomes"] for i in run["implementations"] if i["status"] == "executed"}
             # Lock only what was decided (witnesses of answered questions) or what the original
             # implementations already agreed on (>= 75%). Split cases nobody asked about stay open.
-            decided = {w for q in run["questions"] if q.get("answer_option_id")
+            decided = {w for q in run["questions"] if q.get("answer_option_id") and q["kind"] != "likely_bug"
                        and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])
                        for w in q["witness_input_ids"]}
             locked, left_open = [], []
@@ -571,7 +573,7 @@ class SpecFork:
             if decisions:
                 try:
                     sig_name = run["signature"]["name"]
-                    witness_ids = [w for q in run["questions"] if q.get("answer_option_id")
+                    witness_ids = [w for q in run["questions"] if q.get("answer_option_id") and q["kind"] != "likely_bug"
                                    and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])
                                    for w in q["witness_input_ids"]]
                     by_id = {c["input_id"]: c for c in locked}
