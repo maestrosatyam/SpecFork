@@ -1,0 +1,25 @@
+site_name: SpecFork
+site_description: The ambiguity linter for specs. Find the meanings hiding in a function spec before your coding agent picks one.
+repo_url: https://github.com/maestrosatyam/SpecFork
+edit_uri: edit/main/docs/
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+  features: [navigation.sections, content.code.copy]
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.superfences:
+      custom_fences:
+        - { name: mermaid, class: mermaid, format: !!python/name:pymdownx.superfences.fence_code_format }
+nav:
+  - Home: index.md
+  - CLI and MCP: CLI_AND_MCP.md
+  - Providers and models: PROVIDERS.md
+  - Architecture: ARCHITECTURE.md
+  - HTTP API: API_CONTRACT.md
+  - Evaluation: EVALUATION.md
+  - Security: SECURITY.md

@@ -27,6 +27,7 @@ dependencies = [
 [project.optional-dependencies]
 server = ["fastapi>=0.115", "uvicorn[standard]>=0.30"]
 mcp = ["mcp>=2.3,<3"]
+docs = ["mkdocs-material>=9.5"]
 dev = [
   "specfork[server,mcp]",
   "pytest==9.2.0",

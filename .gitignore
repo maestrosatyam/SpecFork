@@ -39,3 +39,6 @@ specfork.db*
 
 # web UI bundled into the wheel by `make package`
 specfork/_web/
+
+# docs site build output
+site/

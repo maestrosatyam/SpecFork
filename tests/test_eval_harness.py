@@ -17,3 +17,11 @@ async def test_eval_harness_smoke():
     assert res["conditions"]["SF"]["questions"] >= 1
     md = summarize([res], 4)
     assert "SpecFork" in md
+
+
+def test_bootstrap_ci_brackets_mean():
+    from evals.run_eval import bootstrap_ci
+
+    lo, hi = bootstrap_ci([0.0, 0.5, 1.0, 1.0, 0.25])
+    assert 0.0 <= lo <= 0.55 <= hi <= 1.0
+    assert bootstrap_ci([0.3, 0.3]) == (0.3, 0.3)

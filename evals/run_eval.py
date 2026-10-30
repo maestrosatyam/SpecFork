@@ -199,6 +199,17 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
         return out
 
 
+def bootstrap_ci(values: list[float], iters: int = 5000, seed: int = 0) -> tuple[float, float]:
+    """95% percentile bootstrap interval of the mean over items (items are the resampling unit)."""
+    import random as _r
+
+    if not values:
+        return (0.0, 0.0)
+    rng = _r.Random(seed)
+    means = sorted(statistics.mean(rng.choice(values) for _ in values) for _ in range(iters))
+    return (means[int(0.025 * iters)], means[int(0.975 * iters) - 1])
+
+
 def summarize(results: list[dict[str, Any]], n: int) -> str:
     def agg(cond: str, amb: bool) -> dict[str, Any]:
         rows = [r["conditions"][cond] for r in results if r["ambiguous"] == amb and "alignment" in r["conditions"].get(cond, {})]
@@ -211,16 +222,18 @@ def summarize(results: list[dict[str, Any]], n: int) -> str:
             "items_majority_aligned": sum(1 for r in rows if r["executed"] and r["aligned"] / r["executed"] > 0.5),
             "mean_questions": statistics.mean(r["questions"] for r in rows),
             "cost_usd": sum(r["cost_usd"] for r in rows),
+            "ci": bootstrap_ci([r["alignment"] for r in rows]),
         }
 
     lines = [f"Implementations per condition per item: N={n}", "",
-             "| Condition | Spec set | Items | Mean intent alignment | Items >50% aligned | Items 100% aligned | Mean questions | Cost (USD) |",
+             "| Condition | Spec set | Items | Mean intent alignment (95% bootstrap CI) | Items >50% aligned | Items 100% aligned | Mean questions | Cost (USD) |",
              "|---|---|---|---|---|---|---|---|"]
     for amb, label in ((True, "ambiguous"), (False, "control")):
         for cond, name in (("B0", "B0 no clarification"), ("B1", "B1 ask-first (no execution)"), ("SF", "SpecFork")):
             a = agg(cond, amb)
             if a:
-                lines.append(f"| {name} | {label} | {a['items']} | {a['mean_alignment']:.1%} | {a['items_majority_aligned']} | "
+                lo, hi = a["ci"]
+                lines.append(f"| {name} | {label} | {a['items']} | {a['mean_alignment']:.1%} ({lo:.0%}–{hi:.0%}) | {a['items_majority_aligned']} | "
                              f"{a['items_fully_aligned']} | {a['mean_questions']:.2f} | ${a['cost_usd']:.4f} |")
     errs = [(r["id"], c, v["error"]) for r in results for c, v in r["conditions"].items() if "error" in v]
     if errs:
