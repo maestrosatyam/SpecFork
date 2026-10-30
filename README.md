@@ -26,12 +26,13 @@ what you meant.
 
 | Step | What happens | Who decides |
 |---|---|---|
-| 1. Frame | Lightning (reasoning on) proposes a typed signature and 14–18 edge-case probe inputs; plus deterministic type-driven fuzz inputs | model proposes, code validates |
+| 1. Frame | Lightning (reasoning off) proposes a typed signature and 14–18 edge-case probe inputs, plus deterministic type-driven fuzz inputs | model proposes, code validates |
 | 2. Fan-out | N independent implementations from Lightning (reasoning off, temperature 1.0, distinct seeds) | model |
 | 3. Execute | each implementation passes an AST allow-list, then runs on every probe in an isolated subprocess | **code** |
 | 4. Cluster | implementations with identical canonical outputs on all probes form one *behaviour*; witness inputs are chosen by greedy pair-separation | **code** |
-| 5. Explain | Nemotron 3 Ultra (reasoning on) turns each split into a plain-English question, labels likely bugs, summarises clusters | model, grounded in executed outputs |
-| 6. Resolve | your answers select the surviving behaviour; tests are generated **deterministically** from its executed outputs; Ultra rewrites the spec | **code** + model for prose |
+| 5. Explain | Nemotron 3 Ultra (reasoning on, medium effort) turns each split into a plain-English question, labels likely bugs and summarises clusters | model, grounded in executed outputs |
+| 5b. Silent assumptions | Ultra reviews the consensus behaviour's executed outputs and lists decisions the spec never stated but every implementation made the same way (keep it, or change it) | model, grounded in executed outputs |
+| 6. Resolve | your answers select the surviving behaviour (only mutually compatible options); tests are generated **deterministically** from its executed outputs on the decided and consensus cases; Ultra rewrites the spec with only the decided points | **code** + model for prose |
 | 7. Re-fork | N fresh implementations of the clarified spec are run against the locked tests → agreement before vs after | **code** |
 
 Every Nebius call (model ID, latency, tokens, cost, reasoning excerpt) is shown in the app's
@@ -41,13 +42,25 @@ Every Nebius call (model ID, latency, tokens, cost, reasoning excerpt) is shown 
 
 | Role | Model (Nebius Token Factory ID) | Settings |
 |---|---|---|
-| framing, fan-out, re-fork | `nvidia/Nemotron-3_5-Lightning` | `chat_template_kwargs.enable_thinking` on for framing, off for fan-out |
-| explaining disagreements, clarified spec | `nvidia/Nemotron-3-Ultra-550b-a55b` | reasoning on for explain |
+| framing, fan-out, re-fork | `nvidia/Nemotron-3_5-Lightning` | `chat_template_kwargs.enable_thinking: false` |
+| explaining disagreements, silent-assumption review, clarified spec | `nvidia/Nemotron-3-Ultra-550b-a55b` | `enable_thinking: true, medium_effort: true` (falls back to off) |
 
 Endpoint: `https://api.tokenfactory.nebius.com/v1` (OpenAI-compatible chat completions), see
 [`app/llm.py`](app/llm.py). To confirm the integration yourself: `make probe` writes
 `evidence/nebius_model_runtime_probe.json` with model IDs, latencies, token usage and outputs
 (no secrets).
+
+## Results (honest summary)
+
+A live benchmark on 26 ambiguous and 6 clear hand-written specs (N=12 implementations per condition, one run) measured intent alignment: the share of fresh implementations that match a hidden reference.
+
+| Condition | Intent alignment |
+|---|---|
+| No clarification | 21.0% |
+| One ask-first prompt + Ultra rewrite | 39.0% |
+| SpecFork | 41.9% |
+
+SpecFork ties a well-prompted ask-first baseline on alignment and doubles no-clarification. It adds things the baseline cannot produce: executed witnesses for every question, deterministic locked tests and a measured re-fork. The cost is about $0.015 per spec. Details and failure cases are in [`evidence/EVALUATION_RESULTS.md`](evidence/EVALUATION_RESULTS.md).
 
 ## Quick start
 

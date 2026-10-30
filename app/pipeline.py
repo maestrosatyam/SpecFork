@@ -64,7 +64,11 @@ def validate_signature(raw: dict[str, Any]) -> dict[str, Any]:
     if not IDENT.match(name):
         raise PipelineError(f"bad function name from framer: {name!r}")
     params = []
-    for p in raw.get("params") or []:
+    if isinstance(raw.get("signature"), dict):  # tolerate {"signature": {...}, "inputs": [...]}
+        raw = {**raw["signature"], **{k: v for k, v in raw.items() if k != "signature"}}
+    for p in raw.get("params") or raw.get("parameters") or raw.get("args") or []:
+        if not isinstance(p, dict):
+            continue
         pname = str(p.get("name", "")).strip()
         if not IDENT.match(pname):
             raise PipelineError(f"bad parameter name: {pname!r}")
