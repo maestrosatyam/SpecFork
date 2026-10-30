@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from .. import __version__, sandbox
 from ..config import Settings
+from ..export import decision_record, to_yaml
 from ..llm import ModelRouter
 from ..pipeline import PipelineError, SpecFork, new_run, render_tests, summarize
 from ..presets import PRESETS
@@ -378,6 +379,14 @@ async def export_json(run_id: str, request: Request) -> dict[str, Any]:
     return decision_record(run)
 
 
+@api.get("/api/runs/{run_id}/export.yaml", response_class=PlainTextResponse)
+async def export_yaml(run_id: str, request: Request) -> str:
+    run = _get(_st(request), run_id)
+    if not run.get("resolution"):
+        raise HTTPException(409, "not resolved yet")
+    return "# SpecFork decision record: commit as .specfork.yaml next to the code\n" + to_yaml(decision_record(run))
+
+
 @api.get("/api/runs/{run_id}/export.md", response_class=PlainTextResponse)
 async def export_md(run_id: str, request: Request) -> str:
     st = _st(request)
@@ -404,29 +413,6 @@ async def export_md(run_id: str, request: Request) -> str:
     lines += ["", "## Reference implementation", "", "```python", res["reference_code"], "```", "",
               "## Locked tests (pytest)", "", "```python", res["tests_code"], "```", ""]
     return "\n".join(lines)
-
-
-def decision_record(run: dict[str, Any]) -> dict[str, Any]:
-    """Machine-readable result: commit it next to the code (e.g. as .specfork.json)."""
-    res = run["resolution"]
-    q_by_id = {q["id"]: q for q in run["questions"]}
-    decisions = []
-    for qid, oid in (res.get("answers") or {}).items():
-        q = q_by_id.get(qid)
-        if not q or not oid:
-            continue
-        opt = next((o for o in q["options"] if o["id"] == oid), None)
-        decisions.append({"question": q["text"], "kind": q["kind"], "answer": opt["label"] if opt else oid,
-                          "custom": bool(opt and opt.get("is_custom"))})
-    return {
-        "specfork_version": __version__, "run_id": run["id"], "spec": run["spec"],
-        "clarified_spec": res["clarified_spec"], "signature": run["signature"], "decisions": decisions,
-        "locked_cases": [{"args": c["args"], "expected": c["expected_repr"]} for c in res["locked_cases"]],
-        "agreement_before": res["agreement_before"],
-        "agreement_after": (res.get("convergence") or {}).get("agreement_after"),
-        "models": {"fast": run["settings"]["fast_model"], "deep": run["settings"]["deep_model"]},
-        "prompt_version": run["settings"].get("prompt_version"), "prompt_hash": run["settings"].get("prompt_hash"),
-    }
 
 
 # ---------------------------------------------------------------- factory

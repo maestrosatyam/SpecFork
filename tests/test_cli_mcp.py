@@ -103,3 +103,13 @@ async def test_ci_forks_then_resolves_committed_answers(tmp_path, fake_client, m
     assert await cli.cmd_ci(cli.build_parser().parse_args(args)) == 0
     assert (tmp_path / "tests" / "specfork" / "test_split_bill.py").exists()
     assert "resolved" in (tmp_path / "c.md").read_text()
+
+
+def test_yaml_export_round_trips():
+    yaml = pytest.importorskip("yaml")
+    from specfork.export import to_yaml
+
+    data = {"spec": "Split: a bill\nacross people", "n": 3, "ok": True, "none": None, "empty": [], "word": "yes",
+            "cases": [{"args": {"total": 100.0, "n": 3}, "expected": "[33.34, 33.33, 33.33]"}, {"args": {}, "expected": "raises"}],
+            "unicode": "N ≤ 0 raises", "colon": "a: b", "num_str": "123"}
+    assert yaml.safe_load(to_yaml(data)) == data

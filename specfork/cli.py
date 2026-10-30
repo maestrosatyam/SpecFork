@@ -107,8 +107,16 @@ def auto_answers(run: Run) -> dict[str, str]:
     return answers
 
 
-def write_outputs(client: Client, run: Run, out_dir: str | None, module: str, reference: str | None) -> list[str]:
+def write_outputs(client: Client, run: Run, out_dir: str | None, module: str, reference: str | None,
+                  decision_file: str | None = None) -> list[str]:
     written = []
+    if decision_file and run.resolution:
+        from .export import decision_record, to_yaml
+
+        rec = decision_record(run.model_dump())
+        text = json.dumps(rec, indent=1) if decision_file.endswith(".json") else to_yaml(rec)
+        Path(decision_file).write_text(text)
+        written.append(decision_file)
     if out_dir is not None and run.resolution and run.signature:
         d = Path(out_dir)
         d.mkdir(parents=True, exist_ok=True)
@@ -153,7 +161,7 @@ async def cmd_fork(a: argparse.Namespace) -> int:
         run = await client.resolve(run, answers, other)
         if a.refork:
             run = await client.converge(run, a.n)
-        written = write_outputs(client, run, a.out, a.module, a.reference)
+        written = write_outputs(client, run, a.out, a.module, a.reference, a.decision_file)
         if a.json:
             print(run.model_dump_json(indent=1))
             return 0
@@ -174,7 +182,7 @@ async def cmd_resolve(a: argparse.Namespace) -> int:
         run = await client.resolve(run, answers, other)
         if a.refork:
             run = await client.converge(run)
-        written = write_outputs(client, run, a.out, a.module, a.reference)
+        written = write_outputs(client, run, a.out, a.module, a.reference, a.decision_file)
     if a.json:
         print(run.model_dump_json(indent=1))
     else:
@@ -331,6 +339,7 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--out", help="directory to write test_<fn>.py into")
         p.add_argument("--reference", help="file to write the reference implementation to")
         p.add_argument("--refork", action="store_true", help="re-fork the clarified spec and report agreement")
+        p.add_argument("--decision-file", help="write the decision record (.specfork.yaml, or .json)")
         p.add_argument("--json", action="store_true", help="machine-readable output on stdout")
         p.add_argument("--allow-weak-sandbox", action="store_true",
                        help="run model-written code even without network isolation")
