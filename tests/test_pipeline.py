@@ -3,16 +3,15 @@ import json
 import subprocess
 import sys
 
-from app.cluster import agreement, cluster_impls, find_axes, surviving_clusters
-from app.llm import NebiusClient
-from app.pipeline import SpecFork, fuzz_inputs, new_run, validate_inputs, validate_signature
-from tests.fake_llm import FRAME, make_transport
+from specfork.cluster import agreement, cluster_impls, find_axes, surviving_clusters
+from specfork.pipeline import SpecFork, fuzz_inputs, new_run, validate_inputs, validate_signature
+from tests.fake_llm import FRAME, make_router, make_transport
 
 SPEC = "Split a restaurant bill evenly among n people. Return how much each person pays, rounded to cents."
 
 
 def _engine(counter=None):
-    client = NebiusClient(api_key="test", transport=make_transport(counter))
+    client = make_router(make_transport(counter))
     return SpecFork(client, lambda run: None), client
 
 
@@ -154,9 +153,54 @@ async def test_silent_assumption_override_unlocks_cases():
 
 
 def test_compatible_options_with_alternative():
-    from app.cluster import compatible_option_ids
+    from specfork.cluster import compatible_option_ids
     clusters = [{"id": "c0", "kind": "behavior"}, {"id": "c1", "kind": "behavior"}]
     qs = [{"id": "q0", "options": [{"id": "x", "cluster_ids": ["c0"]}, {"id": "y", "cluster_ids": ["c1"]}]},
           {"id": "q1", "options": [{"id": "z", "cluster_ids": ["c1"]}, {"id": "w", "cluster_ids": [], "is_alternative": True}]}]
     assert compatible_option_ids(qs, {"q0": "x"}, "q1", clusters) == ["w"]
     assert compatible_option_ids(qs, {"q1": "w"}, "q0", clusters) == ["x", "y"]
+
+
+async def test_free_text_other_answer_is_implemented_and_executed():
+    eng, client = _engine()
+    run = new_run("t4", SPEC, 8)
+    await eng.run_all(run)
+    q = next(q for q in run["questions"] if q["kind"] == "ambiguity")
+    answers = {x["id"]: x["options"][0]["id"] for x in run["questions"] if x["kind"] in ("ambiguity", "assumption") and x["id"] != q["id"]}
+    await eng.resolve(run, answers, {q["id"]: "the first people pay the leftover cents"})
+    res = run["resolution"]
+    assert run["status"] == "resolved" and res["custom_impl_id"]
+    custom = next(o for o in q["options"] if o.get("is_custom"))
+    assert q["answer_option_id"] == custom["id"] and custom["examples"]  # executed outputs back the custom answer
+    impl = next(i for i in run["implementations"] if i["id"] == res["custom_impl_id"])
+    assert impl["status"] == "executed" and impl["model"] == run["settings"]["deep_model"]
+    assert all(c["input_id"] in impl["outcomes"] for c in res["locked_cases"])
+    await client.aclose()
+
+
+async def test_assumption_confidence_threshold_and_toggle():
+    eng, client = _engine()
+    run = new_run("t5", SPEC, 8)
+    await eng.run_all(run)
+    assert [q["text"] for q in run["questions"] if q["kind"] == "assumption"] == ["Should a $0 bill be split at all?"]
+    off = new_run("t6", SPEC, 8, assumptions=False)
+    await eng.run_all(off)
+    assert not any(q["kind"] == "assumption" for q in off["questions"])
+    await client.aclose()
+
+
+async def test_mixed_model_fanout_assigns_implementers():
+    eng, client = _engine()
+    run = new_run("t7", SPEC, 6, implementers=["nvidia/Nemotron-3_5-Lightning", "nvidia/Nemotron-3-Ultra-550b-a55b"])
+    await eng.run_all(run)
+    models = [i["model"] for i in run["implementations"]]
+    assert models.count("nvidia/Nemotron-3-Ultra-550b-a55b") == 3
+    await client.aclose()
+
+
+def test_render_tests_module_option():
+    from specfork.pipeline import render_tests
+
+    sig = validate_signature(FRAME)
+    code = render_tests(sig, [{"input_id": "i0", "args": {"total": 1, "n": 1}, "expected_repr": "[1]"}], "spec", module="billing.split")
+    assert "from billing.split import split_bill" in code

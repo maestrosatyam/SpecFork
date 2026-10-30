@@ -1,0 +1,30 @@
+# Built-in model profiles. Add your own in a `specfork.toml` (see docs/PROVIDERS.md); user profiles
+# override built-ins with the same key. Prices are USD per 1M tokens [input, output]; a profile without a
+# price is refused when SPECFORK_PUBLIC_DEMO=1 so the daily budget cap can never be silently disabled.
+
+[models.lightning]
+label = "NVIDIA Nemotron 3.5 Lightning"
+provider_label = "Nebius Token Factory"
+api = "openai_compat"
+base_url = "https://api.tokenfactory.nebius.com/v1"
+model = "nvidia/Nemotron-3_5-Lightning"
+key_env = "NEBIUS_API_KEY"
+reasoning = "chat_template_kwargs"      # enable_thinking on/off via the chat template
+seed = true
+json_schema = true
+price_per_m = [0.06, 0.24]
+roles = ["fast"]
+
+[models.ultra]
+label = "NVIDIA Nemotron 3 Ultra"
+provider_label = "Nebius Token Factory"
+api = "openai_compat"
+base_url = "https://api.tokenfactory.nebius.com/v1"
+model = "nvidia/Nemotron-3-Ultra-550b-a55b"
+key_env = "NEBIUS_API_KEY"
+reasoning = "chat_template_kwargs"
+reasoning_extras = { medium = { medium_effort = true }, low = { medium_effort = true } }
+seed = true
+json_schema = false
+price_per_m = [1.00, 3.00]
+roles = ["deep"]

@@ -56,6 +56,8 @@ export type QuestionOption = {
   is_alternative?: boolean;
   /** Model-written example for an alternative, e.g. "parse('03/04/2025') -> '2025-04-03'". NOT executed. */
   note?: string;
+  /** The user's own free-text ("Other…") answer, appended by the backend after resolution. Its examples ARE executed. */
+  is_custom?: boolean;
 };
 
 export type Question = {
@@ -108,6 +110,8 @@ export type Resolution = {
   agreement_before: number;
   agreement_before_counts?: [number, number]; // optional extra: [matched, total]
   unlocked_input_ids?: string[]; // cases dropped from locked tests because an assumption was overridden
+  open_input_ids?: string[]; // undecided split cases no question covered; left out of the locked tests
+  custom_impl_id?: string; // implementation written for the user's free-text answers (in run.implementations)
   convergence?: Convergence;
 };
 
@@ -123,7 +127,7 @@ export type Run = {
   spec: string;
   preset_id?: string;
   is_sample: boolean;
-  settings: { n_samples: number; fast_model: string; deep_model: string };
+  settings: { n_samples: number; fast_model: string; deep_model: string; assumptions?: boolean };
   signature?: Signature;
   inputs: ProbeInput[];
   implementations: Implementation[];
@@ -150,4 +154,31 @@ export type RunSummary = {
   is_sample: boolean;
 };
 
-export type Health = { ok: boolean; llm_configured: boolean; models: { fast: string; deep: string }; version: string };
+export type ModelRole = "fast" | "deep";
+
+/** `model` (the provider model id) is optional; when present it lets the UI label trace calls of non-default models. */
+export type AvailableModel = { key: string; label: string; provider_label?: string; roles: ModelRole[]; model?: string };
+
+export type Health = {
+  ok: boolean;
+  llm_configured: boolean;
+  models: { fast: string; deep: string };
+  version: string;
+  provider_label?: string;
+  public_demo?: boolean;
+  sandbox?: { ok: boolean; net_isolated: boolean };
+  model_labels?: { fast: string; deep: string };
+  available_models?: AvailableModel[];
+};
+
+export type CreateRunBody = {
+  spec: string;
+  n_samples?: number;
+  preset_id?: string;
+  fast_model?: string;
+  deep_model?: string;
+  assumptions?: boolean;
+};
+
+/** POST /answers body: one of `answers[qid]` (option id) or `other[qid]` (free text, 3..300 chars) per question. */
+export type AnswersBody = { answers: Record<string, string>; other: Record<string, string> };

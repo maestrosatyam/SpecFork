@@ -13,12 +13,20 @@ import type {
 
 export const FAST_MODEL = "nvidia/Nemotron-3_5-Lightning";
 export const DEEP_MODEL = "nvidia/Nemotron-3-Ultra-550b-a55b";
+/** Extra registry model so mock mode shows the Advanced model selects. */
+export const SUPER_MODEL = "nvidia/Nemotron-3-Super-120b-a12b";
+// Display labels the mock /api/health returns (the live backend sends its own).
+export const FAST_LABEL = "NVIDIA Nemotron 3.5 Lightning";
+export const DEEP_LABEL = "NVIDIA Nemotron 3 Ultra";
+export const SUPER_LABEL = "NVIDIA Nemotron 3 Super";
+export const PROVIDER_LABEL = "Nebius Token Factory";
 export const BILL_SPEC = "Split a restaurant bill evenly among N people, rounding to cents.";
 export const SAMPLE_RUN_ID = "sample-bill-split";
 
 const PRICES: Record<string, [number, number]> = {
   [FAST_MODEL]: [0.06, 0.24],
   [DEEP_MODEL]: [1.0, 3.0],
+  [SUPER_MODEL]: [0.3, 0.9],
 };
 
 export function cost(model: string, pt: number, ct: number): number {
@@ -497,11 +505,11 @@ export function buildBillRun(opts: BuildOpts): Run {
   for (const q of questions)
     for (const o of q.options) if (o.impl_count === undefined) o.impl_count = optionImplCount(o.cluster_ids);
 
-  // Trace: frame (deep, thinking) → N implement calls (fast) → explain (deep, thinking).
+  // Trace: frame (fast, thinking) → N implement calls (fast) → explain (deep, thinking).
   const trace: CallRecord[] = [];
   let t = created + 0.2;
   trace.push(
-    makeTraceCall(r, "frame: signature + probe inputs", DEEP_MODEL, true, t, { pt: [820, 900], ct: [1650, 1900], lat: [5.6, 6.6] }, FRAME_REASONING),
+    makeTraceCall(r, "frame: signature + probe inputs", FAST_MODEL, true, t, { pt: [820, 900], ct: [1650, 1900], lat: [5.6, 6.6] }, FRAME_REASONING),
   );
   t += trace[0].latency_s + 0.1;
   impls.forEach((impl, i) => {
@@ -521,13 +529,13 @@ export function buildBillRun(opts: BuildOpts): Run {
 
   const log: Run["log"] = [
     { t: created, stage: "frame", msg: `Run created · ${n} samples requested` },
-    { t: created + 0.2, stage: "frame", msg: "Nemotron 3 Ultra is framing the spec (thinking on)…" },
+    { t: created + 0.2, stage: "frame", msg: `${FAST_LABEL} is framing the spec (thinking on)…` },
     { t: trace[0].started_at + trace[0].latency_s, stage: "frame", msg: "Signature: split_bill(total: float, n: int) -> list[float] · 9 probe inputs (5 model, 4 fuzz)" },
-    { t: trace[0].started_at + trace[0].latency_s + 0.1, stage: "fanout", msg: `Fanning out ${n} independent implementations on Nemotron 3.5 Lightning` },
+    { t: trace[0].started_at + trace[0].latency_s + 0.1, stage: "fanout", msg: `Fanning out ${n} independent implementations on ${FAST_LABEL}` },
     { t: fanEnd, stage: "fanout", msg: `${n - alloc.R} generated · ${alloc.R} rejected by static safety check` },
     { t: fanEnd + 0.1, stage: "execute", msg: `Executing ${executed} implementations × ${INPUTS.length} inputs in the sandbox` },
     { t: fanEnd + 1.2, stage: "cluster", msg: `${clusters.length} behaviour clusters (${clusters.filter((c) => c.kind === "crash").length} crash)` },
-    { t: fanEnd + 1.6, stage: "explain", msg: "Nemotron 3 Ultra is turning disagreements into questions…" },
+    { t: fanEnd + 1.6, stage: "explain", msg: `${DEEP_LABEL} is turning disagreements into questions…` },
     { t: end, stage: "explain", msg: `${questions.filter((q) => q.kind === "ambiguity").length} ambiguities · ${questions.filter((q) => q.kind === "assumption").length} silent assumption · ${questions.filter((q) => q.kind === "likely_bug").length} likely bug` },
   ];
 
@@ -654,12 +662,24 @@ export function buildTests(run: Run, cases: Resolution["locked_cases"], spec: st
   return lines.join("\n");
 }
 
-/** Resolution for whatever answers the user picked (mock mirrors the backend's intent). */
-export function buildResolution(run: Run, answers: Record<string, string>): { resolution: Resolution; trace: CallRecord } {
-  const q1 = answers.q1 ?? "q1_first";
-  const q2 = answers.q2 ?? "q2_raise";
-  const a0 = answers.a0 ?? "a0keep";
+export const CUSTOM_IMPL_ID = "impl-custom";
+
+/**
+ * Resolution for whatever answers the user picked (mock mirrors the backend's intent). `other` holds free-text
+ * answers: the mock treats them like the most common behaviour for values, writes the user's words into the spec,
+ * "writes" a custom reference implementation (returned as customImpl) and leaves one split case open.
+ */
+export function buildResolution(
+  run: Run,
+  answers: Record<string, string>,
+  other: Record<string, string> = {},
+): { resolution: Resolution; trace: CallRecord; customImpl?: Implementation } {
+  const custom = (qid: string) => (other[qid] ?? "").trim();
+  const q1 = custom("q1") ? "q1_first" : (answers.q1 ?? "q1_first");
+  const q2 = custom("q2") ? "q2_raise" : (answers.q2 ?? "q2_raise");
+  const a0 = custom("a0") ? "a0keep" : (answers.a0 ?? "a0keep");
   const overrides = a0 === "a0alt" ? ["in9"] : [];
+  const open = custom("q1") ? ["in7"] : [];
   const opt = (qid: string, oid: string) => run.questions.find((q) => q.id === qid)?.options.find((o) => o.id === oid);
   const set1 = new Set(opt("q1", q1)?.cluster_ids ?? []);
   const surviving = (opt("q2", q2)?.cluster_ids ?? []).filter((c) => set1.has(c));
@@ -675,19 +695,29 @@ export function buildResolution(run: Run, answers: Record<string, string>): { re
     return BEHAVIOUR[valueKey][inputId].value_repr;
   };
   const locked = run.inputs
-    .filter((i) => !overrides.includes(i.id))
+    .filter((i) => !overrides.includes(i.id) && !open.includes(i.id))
     .map((i) => ({ input_id: i.id, args: i.args, expected_repr: expected(i.id) }));
-  const matches = run.implementations.filter(
+  const forked = run.implementations.filter((i) => i.id !== CUSTOM_IMPL_ID);
+  const matches = forked.filter(
     (impl) => impl.outcomes && locked.every((c) => impl.outcomes![c.input_id]?.value_repr === c.expected_repr),
   ).length;
 
-  const a0Spec = a0 === "a0alt" ? "A negative total is invalid: raise ValueError." : "A negative total (a refund) is split the same way.";
-  const a0Decision =
-    a0 === "a0alt"
+  const a0Spec = custom("a0")
+    ? `For a negative total: ${custom("a0")}.`
+    : a0 === "a0alt"
+      ? "A negative total is invalid: raise ValueError."
+      : "A negative total (a refund) is split the same way.";
+  const a0Decision = custom("a0")
+    ? `Negative totals: ${custom("a0")} (your own answer).`
+    : a0 === "a0alt"
       ? "Negative totals raise ValueError. This overrides what every implementation assumed."
       : "Negative totals (refunds) are split like any other bill.";
-  const clarified = `${BILL_SPEC} ${Q1_SPEC[q1]} ${Q2_SPEC[q2]} ${a0Spec} Return a list of N floats, one per person, in order.`;
-  const decisions = [Q1_DECISION[q1], Q2_DECISION[q2], a0Decision, "The result has N floats in person order, each with at most 2 decimal places."];
+  const q1Spec = custom("q1") ? `Leftover cents: ${custom("q1")}.` : Q1_SPEC[q1];
+  const q2Spec = custom("q2") ? `If N is zero or negative: ${custom("q2")}.` : Q2_SPEC[q2];
+  const q1Decision = custom("q1") ? `Leftover cents: ${custom("q1")} (your own answer).` : Q1_DECISION[q1];
+  const q2Decision = custom("q2") ? `N ≤ 0: ${custom("q2")} (your own answer).` : Q2_DECISION[q2];
+  const clarified = `${BILL_SPEC} ${q1Spec} ${q2Spec} ${a0Spec} Return a list of N floats, one per person, in order.`;
+  const decisions = [q1Decision, q2Decision, a0Decision, "The result has N floats in person order, each with at most 2 decimal places."];
   const baseRef =
     q1 === "q1_first" && q2 === "q2_raise"
       ? CODE.A[0]
@@ -702,6 +732,20 @@ export function buildResolution(run: Run, answers: Record<string, string>): { re
       ? baseRef.replace(/(def split_bill[^\n]*\n(?: {4}"""[^\n]*\n)?)/, '$1    if total < 0:\n        raise ValueError("total must not be negative")\n')
       : baseRef;
 
+  const anyCustom = Object.values(other).some((t) => t.trim());
+  const customImpl: Implementation | undefined = anyCustom
+    ? {
+        id: CUSTOM_IMPL_ID,
+        index: forked.length,
+        model: run.settings.deep_model,
+        status: "executed",
+        code: refCode,
+        outcomes: Object.fromEntries(
+          run.inputs.map((i) => [i.id, expected(i.id) === "ValueError" ? { ok: false, value_repr: "ValueError", error_type: "ValueError", error_msg: "n must be positive" } : { ok: true, value_repr: expected(i.id) }]),
+        ),
+      }
+    : undefined;
+
   const r = rng(99);
   const now = Date.now() / 1000;
   return {
@@ -714,11 +758,14 @@ export function buildResolution(run: Run, answers: Record<string, string>): { re
       tests_code: buildTests(run, locked, clarified),
       reference_code: refCode,
       locked_cases: locked,
-      agreement_before: run.implementations.length ? matches / run.implementations.length : 0,
-      agreement_before_counts: [matches, run.implementations.length],
+      agreement_before: forked.length ? matches / forked.length : 0,
+      agreement_before_counts: [matches, forked.length],
       unlocked_input_ids: overrides,
+      open_input_ids: open,
+      ...(customImpl ? { custom_impl_id: customImpl.id } : {}),
     },
-    trace: makeTraceCall(r, "clarify: rewrite spec from answers", DEEP_MODEL, true, now, { pt: [1400, 1600], ct: [700, 900], lat: [3.8, 4.6] }, CLARIFY_REASONING),
+    trace: makeTraceCall(r, "clarify: rewrite spec from answers", run.settings.deep_model, true, now, { pt: [1400, 1600], ct: [700, 900], lat: [3.8, 4.6] }, CLARIFY_REASONING),
+    customImpl,
   };
 }
 

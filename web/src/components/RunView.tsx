@@ -1,24 +1,31 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, type Api } from "../api";
 import {
   activeClusterIds,
   ambiguityQuestions,
   answerableQuestions,
+  answeredCount as countAnswered,
   assumptionQuestions,
   answersFromRun,
+  buildAnswersBody,
   clusterStyles,
 } from "../lib/clusters";
 import { formatDate } from "../lib/format";
+import { runModelLabels, useLabels } from "../lib/models";
+import { NOT_OWNER_MSG } from "../lib/runTokens";
 import { useRun } from "../lib/useRun";
 import type { Implementation, Run, RunStatus } from "../types";
 import { IconAlert, IconArrowRight, IconInfo, IconTerminal } from "./Icons";
 import { ClusterLegend, GridStatusLegend, ImplGrid, type Focus } from "./ImplGrid";
-import { ImplDrawer } from "./ImplDrawer";
 import { AssumptionsIntro, ClusterBar, LikelyBugs, LockBar, MeaningsHeader, QuestionCard } from "./Meanings";
 import { LiveLog, Stepper } from "./Pipeline";
 import { ResolutionView } from "./Resolution";
-import { TraceDrawer, TraceSummary } from "./Trace";
+import { TraceSummary } from "./Trace";
+
+// Drawers are code-split: they (and the syntax highlighter) load on first open.
+const ImplDrawer = lazy(() => import("./ImplDrawer"));
+const TraceDrawer = lazy(() => import("./TraceDrawer"));
 
 const STATUS_PILL: Record<RunStatus, { label: string; cls: string; live?: boolean }> = {
   running: { label: "Running live", cls: "border-accent/40 bg-accent/10 text-accent-strong", live: true },
@@ -42,6 +49,7 @@ function StatusPill({ status }: { status: RunStatus }) {
 function errMsg(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.status === 429) return `Rate limited: ${e.detail}`;
+    if (e.status === 403) return NOT_OWNER_MSG;
     return e.detail;
   }
   return e instanceof Error ? e.message : String(e);
@@ -88,7 +96,10 @@ export function RunView({
   onForkSpec: (spec: string) => void;
 }) {
   const { run, error, follow } = useRun(api, id);
+  const labels = useLabels();
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  /** Free-text "Other…" answers; a key present (even "") means Other is selected for that question. */
+  const [other, setOther] = useState<Record<string, string>>({});
   const [hover, setHover] = useState<string | null>(null);
   const [openImpl, setOpenImpl] = useState<Implementation | null>(null);
   const [traceOpen, setTraceOpen] = useState(false);
@@ -100,14 +111,43 @@ export function RunView({
   const resolutionRef = useRef<HTMLDivElement>(null);
   const prevStatus = useRef<RunStatus | null>(null);
   const seededFor = useRef<string | null>(null);
+  const [traceLoaded, setTraceLoaded] = useState(false);
+  const [implLoaded, setImplLoaded] = useState(false);
+  const resolved = !!run?.resolution;
 
-  // Seed answers from the server once per run (e.g. a resolved sample run).
+  // Seed answers from the server once per run (e.g. a resolved sample run), and again when the resolution lands
+  // (the backend then selects the custom option it appended for each free-text answer).
   useEffect(() => {
-    if (run && seededFor.current !== run.id) {
-      seededFor.current = run.id;
-      setAnswers(answersFromRun(run));
+    if (!run) return;
+    const key = `${run.id}:${resolved ? "r" : "-"}`;
+    if (seededFor.current !== key) {
+      const first = !seededFor.current?.startsWith(`${run.id}:`);
+      seededFor.current = key;
+      if (first || resolved) {
+        setAnswers(answersFromRun(run));
+        if (resolved) setOther({});
+      }
     }
-  }, [run]);
+  }, [run, resolved]);
+
+  const chooseOption = useCallback((qid: string, optId: string) => {
+    setAnswers((a) => ({ ...a, [qid]: optId }));
+    setOther((o) => {
+      if (!(qid in o)) return o;
+      const n = { ...o };
+      delete n[qid];
+      return n;
+    });
+  }, []);
+  const chooseOther = useCallback((qid: string, text: string) => {
+    setOther((o) => ({ ...o, [qid]: text }));
+    setAnswers((a) => {
+      if (!(qid in a)) return a;
+      const n = { ...a };
+      delete n[qid];
+      return n;
+    });
+  }, []);
 
   // Scroll to the next thing to look at when the run advances live (not on first load).
   useEffect(() => {
@@ -136,15 +176,14 @@ export function RunView({
     setLockBusy(true);
     setLockErr(null);
     try {
-      const amb = Object.fromEntries(answerableQuestions(run.questions).map((q) => [q.id, answers[q.id]]));
-      const next = await api.postAnswers(run.id, amb);
+      const next = await api.postAnswers(run.id, buildAnswersBody(run.questions, answers, other));
       follow(next);
     } catch (e) {
       setLockErr(errMsg(e));
     } finally {
       setLockBusy(false);
     }
-  }, [api, run, answers, follow]);
+  }, [api, run, answers, other, follow]);
 
   const converge = useCallback(async () => {
     if (!run) return;
@@ -178,13 +217,120 @@ export function RunView({
     );
   }
   if (!run) return <RunSkeleton />;
+  return (
+    <RunBody
+      api={api}
+      run={run}
+      labels={labels}
+      answers={answers}
+      other={other}
+      chooseOption={chooseOption}
+      chooseOther={chooseOther}
+      hover={hover}
+      setHover={setHover}
+      focus={focus}
+      styles={styles}
+      locked={locked}
+      lock={lock}
+      lockBusy={lockBusy}
+      lockErr={lockErr}
+      converge={converge}
+      convBusy={convBusy}
+      convErr={convErr}
+      onHome={onHome}
+      onForkSpec={onForkSpec}
+      meaningsRef={meaningsRef}
+      resolutionRef={resolutionRef}
+      openImpl={openImpl}
+      setOpenImpl={(i) => {
+        if (i) setImplLoaded(true);
+        setOpenImpl(i);
+      }}
+      traceOpen={traceOpen}
+      setTraceOpen={(v) => {
+        if (v) setTraceLoaded(true);
+        setTraceOpen(v);
+      }}
+      traceLoaded={traceLoaded}
+      implLoaded={implLoaded}
+    />
+  );
+}
+
+function RunBody({
+  api,
+  run: fullRun,
+  labels,
+  answers,
+  other,
+  chooseOption,
+  chooseOther,
+  setHover,
+  focus,
+  styles,
+  locked,
+  lock,
+  lockBusy,
+  lockErr,
+  converge,
+  convBusy,
+  convErr,
+  onHome,
+  onForkSpec,
+  meaningsRef,
+  resolutionRef,
+  openImpl,
+  setOpenImpl,
+  traceOpen,
+  setTraceOpen,
+  traceLoaded,
+  implLoaded,
+}: {
+  api: Api;
+  run: Run;
+  labels: ReturnType<typeof useLabels>;
+  answers: Record<string, string>;
+  other: Record<string, string>;
+  chooseOption: (qid: string, optId: string) => void;
+  chooseOther: (qid: string, text: string) => void;
+  hover: string | null;
+  setHover: (id: string | null) => void;
+  focus: Focus;
+  styles: ReturnType<typeof clusterStyles>;
+  locked: boolean;
+  lock: () => void;
+  lockBusy: boolean;
+  lockErr: string | null;
+  converge: () => void;
+  convBusy: boolean;
+  convErr: string | null;
+  onHome: () => void;
+  onForkSpec: (spec: string) => void;
+  meaningsRef: React.RefObject<HTMLDivElement | null>;
+  resolutionRef: React.RefObject<HTMLDivElement | null>;
+  openImpl: Implementation | null;
+  setOpenImpl: (i: Implementation | null) => void;
+  traceOpen: boolean;
+  setTraceOpen: (v: boolean) => void;
+  traceLoaded: boolean;
+  implLoaded: boolean;
+}) {
+  // The implementation written for free-text answers lives in run.implementations but is not one of the forks:
+  // keep it out of the grid, cluster counts and agreement denominators.
+  const customId = fullRun.resolution?.custom_impl_id;
+  const run = useMemo(
+    () => (customId ? { ...fullRun, implementations: fullRun.implementations.filter((i) => i.id !== customId) } : fullRun),
+    [fullRun, customId],
+  );
+  const customImpl = customId ? fullRun.implementations.find((i) => i.id === customId) : undefined;
+  const rl = runModelLabels(run, labels);
 
   // The live server rejects answers/converge on recorded sample runs (409); mock mode lets you click through.
   const recorded = run.is_sample && api.mode === "live";
   const amb = answerableQuestions(run.questions);
   const ambOnly = ambiguityQuestions(run.questions);
   const assumptions = assumptionQuestions(run.questions);
-  const answeredCount = amb.filter((q) => answers[q.id]).length;
+  const answeredCount = countAnswered(run.questions, answers, other);
   const showMeanings = run.clusters.length > 0 && (run.questions.length > 0 || run.status !== "running");
   const executed = run.implementations.filter((i) => i.status === "executed").length;
   const rejected = run.implementations.filter((i) => i.status === "rejected").length;
@@ -306,9 +452,11 @@ export function RunView({
                     idx={i}
                     answer={answers[q.id]}
                     answers={answers}
+                    otherText={other[q.id]}
                     readOnly={locked}
                     styles={styles}
-                    onAnswer={(opt) => setAnswers((a) => ({ ...a, [q.id]: opt }))}
+                    onAnswer={(opt) => chooseOption(q.id, opt)}
+                    onOther={(text) => chooseOther(q.id, text)}
                     onHover={setHover}
                   />
                 ))}
@@ -321,9 +469,11 @@ export function RunView({
                     idx={i}
                     answer={answers[q.id]}
                     answers={answers}
+                    otherText={other[q.id]}
                     readOnly={locked}
                     styles={styles}
-                    onAnswer={(opt) => setAnswers((a) => ({ ...a, [q.id]: opt }))}
+                    onAnswer={(opt) => chooseOption(q.id, opt)}
+                    onOther={(text) => chooseOther(q.id, text)}
                     onHover={setHover}
                   />
                 ))}
@@ -349,7 +499,7 @@ export function RunView({
               <div>
                 <div className="font-display text-[18px] font-semibold text-fog-50">Writing your clarified spec…</div>
                 <div className="text-[14.5px] text-fog-400">
-                  Nemotron 3 Ultra is folding your answers into the spec. Tests are generated deterministically from the witnesses.
+                  {rl.deep} is folding your answers into the spec. Tests are generated deterministically from the witnesses.
                 </div>
               </div>
             </div>
@@ -370,6 +520,9 @@ export function RunView({
                 error={convErr}
                 onConverge={recorded ? () => onForkSpec(run.spec) : converge}
                 convergeLabel={recorded ? "Fork it live" : undefined}
+                deepLabel={rl.deep}
+                customImpl={customImpl}
+                onOpenImpl={setOpenImpl}
               />
             </motion.div>
           )}
@@ -380,13 +533,17 @@ export function RunView({
         </main>
       </div>
 
-      <ImplDrawer
-        run={run}
-        impl={openImpl ? (run.implementations.find((i) => i.id === openImpl.id) ?? openImpl) : null}
-        styles={styles}
-        onClose={() => setOpenImpl(null)}
-      />
-      <TraceDrawer run={run} open={traceOpen} onClose={() => setTraceOpen(false)} />
+      <Suspense fallback={null}>
+        {implLoaded && (
+          <ImplDrawer
+            run={fullRun}
+            impl={openImpl ? (fullRun.implementations.find((i) => i.id === openImpl.id) ?? openImpl) : null}
+            styles={styles}
+            onClose={() => setOpenImpl(null)}
+          />
+        )}
+        {traceLoaded && <TraceDrawer run={fullRun} open={traceOpen} onClose={() => setTraceOpen(false)} />}
+      </Suspense>
     </div>
   );
 }

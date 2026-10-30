@@ -1,22 +1,14 @@
+// Lazy-loaded (see RunView).
 import type { ClusterStyle } from "../lib/clusters";
 import { formatCall, shortModel } from "../lib/format";
+import { modelLabel, useLabels } from "../lib/models";
+import { ClusterSwatch } from "./ClusterSwatch";
 import type { Implementation, Run } from "../types";
 import { CodeBlock, CopyButton } from "./CodeBlock";
 import { IconCheck, IconLock, IconX } from "./Icons";
 import { Drawer } from "./Overlay";
 
-export function ClusterSwatch({ style, size = 14 }: { style?: ClusterStyle; size?: number }) {
-  if (!style) return null;
-  return (
-    <span
-      className={`inline-block shrink-0 rounded-[4px] ${style.crash ? "stripes" : ""}`}
-      style={{ width: size, height: size, background: style.crash ? undefined : style.color }}
-      aria-hidden
-    />
-  );
-}
-
-export function ImplDrawer({
+export default function ImplDrawer({
   run,
   impl,
   styles,
@@ -32,16 +24,20 @@ export function ImplDrawer({
   const witnessIds = new Set(run.questions.flatMap((q) => q.witness_input_ids));
   const expected = new Map(run.resolution?.locked_cases.map((c) => [c.input_id, c.expected_repr]) ?? []);
   const fn = run.signature?.name;
+  const labels = useLabels();
+  const isCustom = !!impl && impl.id === run.resolution?.custom_impl_id;
 
   return (
     <Drawer
       open={!!impl}
       onClose={onClose}
-      title={impl ? `Implementation #${String(impl.index + 1).padStart(2, "0")}` : ""}
+      title={impl ? (isCustom ? "Reference implementation from your own answer" : `Implementation #${String(impl.index + 1).padStart(2, "0")}`) : ""}
       subtitle={
         impl && (
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="mono">{shortModel(impl.model)}</span>
+            <span title={impl.model}>
+              {modelLabel(impl.model, labels)} <span className="mono text-fog-500">({shortModel(impl.model)})</span>
+            </span>
             <span aria-hidden>·</span>
             <span>status: {impl.status}</span>
             {cluster && (

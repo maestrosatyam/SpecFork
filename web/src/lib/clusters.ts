@@ -53,8 +53,8 @@ export function answerableQuestions(qs: Question[]): Question[] {
  * Given the user's (possibly partial) selections, which clusters are still consistent with them?
  * Returns null when nothing constrains (meaning: no filtering, everything is highlighted).
  * Intersection over answered questions of the chosen option's cluster_ids. Alternative options
- * (overriding a silent assumption) are ignored: no implementation does them, so they say nothing
- * about which existing clusters survive.
+ * (overriding a silent assumption) and custom free-text options are ignored: no forked implementation
+ * does them, so they say nothing about which existing clusters survive.
  */
 export function activeClusterIds(
   questions: Question[],
@@ -67,7 +67,7 @@ export function activeClusterIds(
     const optId = answers[q.id];
     if (!optId) continue;
     const opt = q.options.find((o) => o.id === optId);
-    if (!opt || opt.is_alternative) continue;
+    if (!opt || ignoresClusters(opt)) continue;
     const ids = new Set(opt.cluster_ids);
     const prev: Set<string> | null = active;
     active = prev === null ? ids : new Set([...prev].filter((id: string) => ids.has(id)));
@@ -85,15 +85,66 @@ export function optionCompatible(
   q: Question,
   opt: QuestionOption,
 ): boolean {
-  if (opt.is_alternative) return true;
+  if (ignoresClusters(opt)) return true;
   const alive = activeClusterIds(questions, answers, q.id);
   if (alive === null) return true;
   return opt.cluster_ids.some((id) => alive.has(id));
 }
 
-export function allAnswered(questions: Question[], answers: Record<string, string>): boolean {
+/** Options that never constrain cluster highlighting: assumption overrides and the user's own free-text answers. */
+export function ignoresClusters(opt: QuestionOption): boolean {
+  return !!opt.is_alternative || !!opt.is_custom;
+}
+
+export const OTHER_MIN = 3;
+export const OTHER_MAX = 300;
+
+/** A free-text "Other…" answer counts once it has at least OTHER_MIN non-space characters. */
+export function otherValid(text: string | undefined): boolean {
+  return typeof text === "string" && text.trim().length >= OTHER_MIN;
+}
+
+/** Answered = a known option is selected, OR a valid free-text answer is given. */
+export function isAnswered(q: Question, answers: Record<string, string>, other: Record<string, string> = {}): boolean {
+  const a = answers[q.id];
+  if (a && q.options.some((o) => o.id === a)) return true;
+  return otherValid(other[q.id]);
+}
+
+export function answeredCount(
+  questions: Question[],
+  answers: Record<string, string>,
+  other: Record<string, string> = {},
+): number {
+  return answerableQuestions(questions).filter((q) => isAnswered(q, answers, other)).length;
+}
+
+export function allAnswered(
+  questions: Question[],
+  answers: Record<string, string>,
+  other: Record<string, string> = {},
+): boolean {
   const qs = answerableQuestions(questions);
-  return qs.length > 0 && qs.every((q) => !!answers[q.id] && q.options.some((o) => o.id === answers[q.id]));
+  return qs.length > 0 && qs.every((q) => isAnswered(q, answers, other));
+}
+
+/**
+ * The POST /answers body: exactly one of option or free text per answerable question. A selected option wins
+ * when both are somehow present (the UI clears one when the other is chosen). Free text is trimmed and capped.
+ */
+export function buildAnswersBody(
+  questions: Question[],
+  answers: Record<string, string>,
+  other: Record<string, string> = {},
+): { answers: Record<string, string>; other: Record<string, string> } {
+  const outA: Record<string, string> = {};
+  const outO: Record<string, string> = {};
+  for (const q of answerableQuestions(questions)) {
+    const a = answers[q.id];
+    if (a && q.options.some((o) => o.id === a)) outA[q.id] = a;
+    else if (otherValid(other[q.id])) outO[q.id] = other[q.id].trim().slice(0, OTHER_MAX);
+  }
+  return { answers: outA, other: outO };
 }
 
 /** @deprecated kept for compatibility; same as allAnswered (ambiguities + assumptions). */
@@ -108,7 +159,7 @@ export function optionImplCount(clusters: Cluster[], clusterIds: string[]): numb
 /** Implementations choosing an option: the server's impl_count when present, else derived from clusters. */
 export function optionCount(clusters: Cluster[], opt: QuestionOption): number {
   if (typeof opt.impl_count === "number") return opt.impl_count;
-  if (opt.is_alternative) return 0;
+  if (ignoresClusters(opt)) return 0;
   return optionImplCount(clusters, opt.cluster_ids);
 }
 

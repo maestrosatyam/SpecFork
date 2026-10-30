@@ -2,7 +2,7 @@
 
 Reads {"code", "func", "inputs", "timeout", "allowed_imports"} JSON on stdin and writes
 {"ok", "outcomes": {input_id: {ok, value_repr, error_type?, error_msg?}}} JSON to stdout.
-This file must not import anything from the ``app`` package.
+This file must not import anything from the ``specfork`` package.
 """
 import builtins
 import json
@@ -66,7 +66,7 @@ def canon(v, _depth=0):
     if isinstance(v, (_dt.datetime, _dt.date, _dt.time)):
         return v.isoformat()
     if isinstance(v, _dt.timedelta):
-        return "timedelta(%r)" % v.total_seconds()
+        return f"timedelta({v.total_seconds()!r})"
     if isinstance(v, (list, tuple)):
         return "[" + ", ".join(canon(x, _depth + 1) for x in v) + "]"
     if isinstance(v, (set, frozenset)):

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/maestrosatyam/SpecFork/security/advisories/new
+    about: Sandbox escapes, secret exposure and other vulnerabilities. Please read SECURITY.md first; do not open a public issue.
+  - name: Security policy
+    url: https://github.com/maestrosatyam/SpecFork/blob/main/SECURITY.md
+    about: Supported versions, scope and response targets.

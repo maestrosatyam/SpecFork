@@ -13,10 +13,10 @@ so both may be adversarial / prompt-injected):
 from __future__ import annotations
 
 import ast
-import re
 import asyncio
 import json
 import os
+import re
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -44,7 +44,16 @@ BANNED_ATTRS = {
 MAX_CODE_CHARS = 12_000
 HARNESS = Path(__file__).with_name("_harness.py")
 # When set, the harness refuses to run model code unless it could drop network access (user+net namespace).
-REQUIRE_ISOLATION = os.environ.get("SANDBOX_REQUIRE_ISOLATION", "0") == "1"
+# Configured explicitly via ``configure()`` (no environment reads at import time).
+REQUIRE_ISOLATION = False
+_CONCURRENCY = 0
+
+
+def configure(require_isolation: bool = False, concurrency: int = 0) -> None:
+    global REQUIRE_ISOLATION, _CONCURRENCY, _EXEC_SEM
+    REQUIRE_ISOLATION = require_isolation
+    _CONCURRENCY = concurrency
+    _EXEC_SEM = None
 
 
 @dataclass
@@ -170,7 +179,7 @@ async def run_function(
         )
         try:
             out = await asyncio.wait_for(_bounded_exchange(proc, payload.encode()), timeout=total_timeout_s)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ExecResult(False, {}, "process timeout")
         except OutputTooLarge:
             return ExecResult(False, {}, "output too large")
@@ -178,7 +187,7 @@ async def run_function(
             _kill_group(proc)
             try:
                 await asyncio.wait_for(proc.wait(), timeout=5)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
     try:
         data = json.loads(out.decode() or "{}")
@@ -240,5 +249,5 @@ _EXEC_SEM: asyncio.Semaphore | None = None
 def exec_semaphore() -> asyncio.Semaphore:
     global _EXEC_SEM
     if _EXEC_SEM is None:
-        _EXEC_SEM = asyncio.Semaphore(int(os.environ.get("SANDBOX_CONCURRENCY", "0")) or max(2, min(8, (os.cpu_count() or 2) * 2)))
+        _EXEC_SEM = asyncio.Semaphore(_CONCURRENCY or max(2, min(8, (os.cpu_count() or 2) * 2)))
     return _EXEC_SEM

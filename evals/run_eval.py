@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import os
 import statistics
 import sys
 import time
@@ -30,23 +29,24 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def load_env() -> None:
-    """Load .env (do not import app.main for this: it removes the key from os.environ)."""
-    if (ROOT / ".env").exists():
-        for line in (ROOT / ".env").read_text().splitlines():
-            if "=" in line and not line.lstrip().startswith("#"):
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+MODEL_FAST = "nvidia/Nemotron-3_5-Lightning"  # replaced from Settings in main()
+MODEL_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
+ASSUME_CONF, ASSUME_MAX = 0.6, 2  # replaced from Settings in main()
 
-from app import prompts  # noqa: E402
-from app.cluster import compatible_option_ids, outcome_key  # noqa: E402
-from app.llm import MODEL_DEEP, MODEL_FAST, NebiusClient, extract_json  # noqa: E402
-from app.pipeline import SpecFork, add_trace, extract_code, new_run  # noqa: E402
-from app.sandbox import check_code, exec_semaphore, run_function  # noqa: E402
+
+
+from specfork import prompts  # noqa: E402
+from specfork.cluster import compatible_option_ids, outcome_key  # noqa: E402
+from specfork.config import Settings  # noqa: E402
+from specfork.llm import ModelRouter, extract_json  # noqa: E402
+from specfork.pipeline import SpecFork, add_trace, extract_code, new_run  # noqa: E402
+from specfork.registry import Registry  # noqa: E402
+from specfork.sandbox import check_code, exec_semaphore, run_function  # noqa: E402
 
 SIM_USER_SYSTEM = """You are the product owner who wrote a function spec. Your full, private intent is below.
-Answer the clarifying question by choosing the option that matches your intent. If none matches exactly,
-choose the closest. Reply with JSON only: {"option": "<option id>"}"""
+Answer the clarifying question by choosing the option that matches your intent. If NO option matches your
+intent, describe the behaviour you want in one precise sentence instead. Reply with JSON only:
+{"option": "<option id>"} or {"other": "<one sentence>"}"""
 
 SIM_USER_FREE_SYSTEM = """You are the product owner who wrote a function spec. Your full, private intent is below.
 Answer each clarifying question briefly and precisely according to your intent (one or two sentences each).
@@ -84,7 +84,7 @@ async def reference_outcomes(item: dict[str, Any], inputs: list[dict[str, Any]])
     return {k: outcome_key(v) for k, v in res.outcomes.items()}
 
 
-async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asyncio.Semaphore) -> dict[str, Any]:
+async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyncio.Semaphore) -> dict[str, Any]:
     async with sem:
         t0 = time.perf_counter()
         sig = {**item["signature"], "docstring": ""}
@@ -94,16 +94,16 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
         seed = sum(map(ord, item["id"])) * 1000
 
         # ---------------- B0
-        r0 = new_run(f"b0-{item['id']}", item["spec"], n)
+        r0 = new_run(f"b0-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP)
         r0["signature"], r0["hidden_inputs"] = sig, hidden
-        eng = SpecFork(client, lambda r: None)
+        eng = SpecFork(client, lambda r: None, assumption_min_confidence=ASSUME_CONF, max_assumptions=ASSUME_MAX)
         impls = await implement_many(eng, r0, item["spec"], sig, n, "b0_", seed)
         ok, k = alignment(impls, expected)
         out["conditions"]["B0"] = {"aligned": ok, "executed": k, "alignment": ok / k if k else 0.0, "questions": 0,
                                    "cost_usd": r0["metrics"]["total_cost_usd"], "calls": r0["metrics"]["n_calls"]}
 
         # ---------------- B1
-        r1 = new_run(f"b1-{item['id']}", item["spec"], n)
+        r1 = new_run(f"b1-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP)
         r1["signature"], r1["hidden_inputs"] = sig, hidden
         try:
             raw = await eng._json_call(r1, "ask", ASK_SYSTEM, prompts.frame_user(item["spec"], sig),
@@ -127,7 +127,7 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
             out["conditions"]["B1"] = {"error": f"{type(e).__name__}: {str(e)[:200]}", "cost_usd": r1["metrics"]["total_cost_usd"]}
 
         # ---------------- SpecFork
-        rs = new_run(f"sf-{item['id']}", item["spec"], n)
+        rs = new_run(f"sf-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP)
         rs["signature"] = sig
         try:
             await eng.run_all(rs)
@@ -136,6 +136,7 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
             inputs = {i["id"]: i for i in rs["inputs"]}
             answers = {q["id"]: q["answer_option_id"] for q in rs["questions"]
                        if q["kind"] == "likely_bug" and q.get("answer_option_id")}
+            other: dict[str, str] = {}
             for q in rs["questions"]:
                 if q["kind"] not in ("ambiguity", "assumption"):
                     continue
@@ -152,8 +153,11 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
                                             f"Spec:\n{item['spec']}\n\nYour intent:\n{item['intent']}\n\nQuestion: {q['text']}\nOptions:\n{json.dumps(opts, indent=1)}",
                                             model=MODEL_FAST, thinking=False, max_tokens=300, temperature=0.0)
                 oid = pick.get("option")
-                answers[q["id"]] = oid if any(o["id"] == oid for o in cands) else cands[0]["id"]
-            await eng.resolve(rs, answers)
+                if isinstance(pick.get("other"), str) and 3 <= len(pick["other"].strip()) <= 300 and not oid:
+                    other[q["id"]] = pick["other"].strip()
+                else:
+                    answers[q["id"]] = oid if any(o["id"] == oid for o in cands) else cands[0]["id"]
+            await eng.resolve(rs, answers, other)
             res = rs["resolution"]
             rs["hidden_inputs"] = hidden
             impls = await implement_many(eng, rs, res["clarified_spec"], sig, n, "sf_", seed + 200)
@@ -173,6 +177,7 @@ async def eval_item(item: dict[str, Any], client: NebiusClient, n: int, sem: asy
                 "aligned": ok, "executed": k, "alignment": ok / k if k else 0.0,
                 "questions": sum(1 for q in rs["questions"] if q["kind"] in ("ambiguity", "assumption")),
                 "assumptions": sum(1 for q in rs["questions"] if q["kind"] == "assumption"),
+                "free_text_answers": len(other),
                 "likely_bugs": sum(1 for q in rs["questions"] if q["kind"] == "likely_bug"),
                 "question_texts": [q["text"] for q in rs["questions"] if q["kind"] in ("ambiguity", "assumption")],
                 "behaviours": len([c for c in rs["clusters"] if c["kind"] == "behavior"]),
@@ -231,15 +236,16 @@ async def main() -> int:
     ap.add_argument("--concurrency", type=int, default=3)
     ap.add_argument("--out", default=str(ROOT / "evals" / "results"))
     args = ap.parse_args()
-    load_env()
-    if not os.environ.get("NEBIUS_API_KEY"):
-        print("NEBIUS_API_KEY missing", file=sys.stderr)
-        return 2
     items = json.loads((ROOT / "evals" / "benchmark" / "specs.json").read_text())
     if args.items:
         wanted = set(args.items.split(","))
         items = [i for i in items if i["id"] in wanted]
-    client = NebiusClient(max_concurrency=12)
+    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX
+    settings = Settings.load(ROOT / ".env")
+    ASSUME_CONF, ASSUME_MAX = settings.assumption_min_confidence, settings.max_assumptions
+    registry = Registry.load(settings.models_file)
+    MODEL_FAST, MODEL_DEEP = registry.get(settings.fast_model).model, registry.get(settings.deep_model).model
+    client = ModelRouter(registry, settings.api_keys, max_concurrency=12, default_model=settings.fast_model)
     sem = asyncio.Semaphore(args.concurrency)
     t0 = time.time()
     results = await asyncio.gather(*(eval_item(i, client, args.n, sem) for i in items))
@@ -247,7 +253,7 @@ async def main() -> int:
     stamp = time.strftime("%Y%m%d-%H%M%S")
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
-    meta = {"timestamp": stamp, "n": args.n, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
+    meta = {"timestamp": stamp, "n": args.n, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
             "prompt_version": prompts.PROMPT_VERSION, "wall_s": round(time.time() - t0, 1), "items": len(items)}
     (outdir / f"eval-{stamp}.json").write_text(json.dumps({"meta": meta, "results": results}, indent=1))
     summary = summarize(results, args.n)

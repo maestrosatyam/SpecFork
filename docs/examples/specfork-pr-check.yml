@@ -1,0 +1,20 @@
+# Example workflow: .github/workflows/specfork.yml in a repository that keeps one function spec per file in specs/.
+name: SpecFork
+on:
+  pull_request:
+    paths: ["specs/**", ".specfork/**"]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  ambiguity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maestrosatyam/SpecFork@main
+        with:
+          specs: "specs/*.md"
+          module: "myproject.functions"
+          nebius-api-key: ${{ secrets.NEBIUS_API_KEY }}
+      # Commit .specfork/<spec>.run.json once, answer in .specfork/<spec>.answers.json; the next run writes
+      # tests/specfork/test_<function>.py, which you commit with the implementation.

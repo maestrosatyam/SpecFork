@@ -8,12 +8,15 @@ import {
   likelyBugQuestions,
   optionCompatible,
   optionCount,
+  OTHER_MAX,
+  OTHER_MIN,
+  otherValid,
 } from "../lib/clusters";
 import { formatCall, formatPct, isErrorRepr } from "../lib/format";
 import type { Cluster, Question, QuestionOption, Run } from "../types";
 import { IconAlert, IconBug, IconCheck, IconLock } from "./Icons";
 import type { Focus } from "./ImplGrid";
-import { ClusterSwatch } from "./ImplDrawer";
+import { ClusterSwatch } from "./ClusterSwatch";
 
 export function ClusterBar({
   clusters,
@@ -133,6 +136,7 @@ function OptionCard({
   const share = total ? count / total : 0;
   const assumption = q.kind === "assumption";
   const alt = !!opt.is_alternative;
+  const custom = !!opt.is_custom;
   const incompatibleMsg = "No implementation does this together with your other answers";
   return (
     <label
@@ -166,7 +170,7 @@ function OptionCard({
           {selected && <IconCheck size={12} strokeWidth={3} />}
         </span>
         <span className="text-[16px] font-semibold leading-snug text-fog-50">
-          {assumption && (
+          {assumption && !custom && (
             <span className={`mr-1.5 font-display text-[13px] font-bold uppercase tracking-wider ${alt ? "text-warn" : "text-add"}`}>
               {alt ? "Change to:" : "Keep:"}
             </span>
@@ -174,7 +178,20 @@ function OptionCard({
           {opt.label}
         </span>
       </div>
-      {alt ? (
+      {custom && (
+        <span className="mt-2.5 inline-flex w-fit items-center gap-1.5 rounded-full border border-accent/35 bg-accent/10 px-2.5 py-0.5 text-[12px] font-semibold text-accent-strong">
+          <IconCheck size={12} strokeWidth={2.8} /> Your answer · executed
+        </span>
+      )}
+      {custom ? (
+        opt.examples.length > 0 ? (
+          <div className="mt-3 space-y-1 rounded-xl bg-ink-950/60 px-3 py-2.5">
+            {opt.examples.map((ex) => (
+              <Witness key={ex.input_id} run={run} inputId={ex.input_id} value={ex.value_repr} />
+            ))}
+          </div>
+        ) : null
+      ) : alt ? (
         <div className="mt-3 rounded-xl border border-dashed border-warn/30 bg-warn/[0.04] px-3 py-2.5">
           <div className="mb-1 text-[11.5px] font-semibold uppercase tracking-wider text-warn/90">Proposed, not executed</div>
           {opt.note ? (
@@ -198,7 +215,11 @@ function OptionCard({
           {incompatibleMsg}
         </p>
       )}
-      {alt ? (
+      {custom ? (
+        <div className="mt-auto pt-3.5 text-[13.5px] text-fog-400">
+          A reference implementation was written from your words and run on every probe.
+        </div>
+      ) : alt ? (
         <div className="mt-auto pt-3.5 text-[13.5px] text-fog-400">
           No implementation does this yet. Locked tests will skip the affected cases.
         </div>
@@ -231,15 +252,99 @@ function OptionCard({
   );
 }
 
+/** "Other…": the user describes the behaviour in their own words (sent as `other[qid]`, 3..300 chars). */
+function OtherCard({
+  q,
+  text,
+  readOnly,
+  onSelect,
+  onChange,
+}: {
+  q: Question;
+  /** undefined = not selected. */
+  text: string | undefined;
+  readOnly: boolean;
+  onSelect: () => void;
+  onChange: (t: string) => void;
+}) {
+  const selected = text !== undefined;
+  const len = text?.trim().length ?? 0;
+  const tooShort = selected && len > 0 && len < OTHER_MIN;
+  const taId = `other-${q.id}`;
+  return (
+    <div
+      className={`flex h-full flex-col rounded-2xl border p-4 transition-[border-color,background-color] duration-200 ${
+        selected ? "border-fog-100/80 bg-white/[0.07]" : "border-dashed border-white/15 bg-white/[0.015] hover:border-white/30"
+      } has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent`}
+    >
+      <label className={`flex items-start gap-3 ${readOnly ? "cursor-default" : "cursor-pointer"}`}>
+        <input
+          type="radio"
+          className="sr-only"
+          name={`q-${q.id}`}
+          value="__other"
+          checked={selected}
+          disabled={readOnly && !selected}
+          onChange={() => !readOnly && onSelect()}
+        />
+        <span
+          className={`mt-0.5 flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+            selected ? "border-fog-50 bg-fog-50 text-ink-900" : "border-fog-500"
+          }`}
+          aria-hidden
+        >
+          {selected && <IconCheck size={12} strokeWidth={3} />}
+        </span>
+        <span>
+          <span className="text-[16px] font-semibold leading-snug text-fog-50">Other…</span>
+          <span className="mt-0.5 block text-[13.5px] text-fog-400">None of these? Say what you want instead.</span>
+        </span>
+      </label>
+      {selected && (
+        <div className="mt-3">
+          <label htmlFor={taId} className="sr-only">
+            Describe the behaviour you want
+          </label>
+          <textarea
+            id={taId}
+            value={text}
+            readOnly={readOnly}
+            autoFocus={!readOnly && !text}
+            maxLength={OTHER_MAX}
+            rows={3}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Describe the behaviour you want"
+            aria-invalid={tooShort}
+            aria-describedby={`${taId}-help`}
+            className="block w-full resize-y rounded-xl border border-white/10 bg-ink-950/60 px-3 py-2.5 text-[14.5px] leading-relaxed text-fog-50 placeholder:text-fog-500/70 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-warn/50"
+          />
+          <p id={`${taId}-help`} className={`mt-1.5 flex justify-between gap-2 text-[12.5px] ${tooShort ? "text-warn" : "text-fog-500"}`}>
+            <span>
+              {tooShort
+                ? `At least ${OTHER_MIN} characters.`
+                : "A reference implementation is written from your words and executed on every probe."}
+            </span>
+            <span className="tabular-nums">
+              {text?.length ?? 0}/{OTHER_MAX}
+            </span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function QuestionCard({
   run,
   q,
   idx,
   answer,
   answers,
+  otherText,
   readOnly,
   styles,
   onAnswer,
+  onOther,
   onHover,
 }: {
   run: Run;
@@ -248,17 +353,24 @@ export function QuestionCard({
   answer?: string;
   /** All current selections, used for compatibility hints. */
   answers: Record<string, string>;
+  /** Free-text answer; undefined when "Other…" isn't selected. */
+  otherText?: string;
   readOnly: boolean;
   styles: Record<string, ClusterStyle>;
   onAnswer: (optId: string) => void;
+  /** Select "Other…" / edit its text (clears any selected option). */
+  onOther?: (text: string) => void;
   onHover: (id: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const assumption = q.kind === "assumption";
   const total = run.implementations.length;
-  const cols = q.options.length >= 3 ? "lg:grid-cols-3" : "md:grid-cols-2";
   const chosen = q.options.find((o) => o.id === answer);
+  const showOther = !!onOther && (!readOnly || otherText !== undefined);
+  const nCards = q.options.length + (showOther ? 1 : 0);
+  const cols = nCards === 4 ? "md:grid-cols-2 2xl:grid-cols-4" : nCards >= 3 ? "lg:grid-cols-3" : "md:grid-cols-2";
   const compact = readOnly && !!chosen && !expanded;
+  const answered = !!chosen || otherValid(otherText);
   return (
     <motion.section
       className="card p-5 sm:p-6"
@@ -270,10 +382,10 @@ export function QuestionCard({
       <div className="flex items-start gap-4">
         <span
           className={`flex h-9 min-w-9 items-center justify-center rounded-lg px-2 font-display text-[15px] font-bold ${
-            answer ? "bg-fog-100 text-ink-900" : "bg-white/[0.07] text-fog-200"
+            answered ? "bg-fog-100 text-ink-900" : "bg-white/[0.07] text-fog-200"
           }`}
         >
-          {answer ? <IconCheck size={17} strokeWidth={2.6} /> : `${assumption ? "A" : "Q"}${idx + 1}`}
+          {answered ? <IconCheck size={17} strokeWidth={2.6} /> : `${assumption ? "A" : "Q"}${idx + 1}`}
         </span>
         <div className="min-w-0">
           {assumption && typeof q.agree_count === "number" && (
@@ -295,15 +407,32 @@ export function QuestionCard({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-fog-100/30 bg-white/[0.04] px-4 py-3 sm:ml-[52px]">
           <span className="flex items-center gap-2.5 text-[16px] font-semibold text-fog-50">
             <IconCheck size={16} strokeWidth={2.6} className="text-add" />
-            {assumption && <span className={chosen!.is_alternative ? "text-warn" : "text-add"}>{chosen!.is_alternative ? "Change to:" : "Keep:"}</span>}
+            {assumption && !chosen!.is_custom && (
+              <span className={chosen!.is_alternative ? "text-warn" : "text-add"}>{chosen!.is_alternative ? "Change to:" : "Keep:"}</span>
+            )}
             {chosen!.label}
           </span>
           <span className="flex items-center gap-3 text-[13.5px] text-fog-400">
-            {chosen!.is_alternative ? "proposed, not executed" : `chosen by ${optionCount(run.clusters, chosen!)} of ${total}`}
+            {chosen!.is_custom ? (
+              <span className="rounded-full border border-accent/35 bg-accent/10 px-2.5 py-0.5 text-[12px] font-semibold text-accent-strong">
+                Your answer · executed
+              </span>
+            ) : chosen!.is_alternative ? (
+              "proposed, not executed"
+            ) : (
+              `chosen by ${optionCount(run.clusters, chosen!)} of ${total}`
+            )}
             <button type="button" className="btn btn-quiet py-1 text-[13px]" onClick={() => setExpanded(true)} aria-expanded={false}>
               Show all {q.options.length} options
             </button>
           </span>
+          {chosen!.is_custom && chosen!.examples.length > 0 && (
+            <div className="w-full space-y-1 rounded-lg bg-ink-950/60 px-3 py-2">
+              {chosen!.examples.map((ex) => (
+                <Witness key={ex.input_id} run={run} inputId={ex.input_id} value={ex.value_repr} />
+              ))}
+            </div>
+          )}
         </div>
       ) : (
       <div role="radiogroup" aria-labelledby={`q-${q.id}-text`} className={`mt-5 grid gap-3 ${cols}`}>
@@ -322,6 +451,15 @@ export function QuestionCard({
             onHover={onHover}
           />
         ))}
+        {showOther && (
+          <OtherCard
+            q={q}
+            text={otherText}
+            readOnly={readOnly}
+            onSelect={() => onOther!(otherText ?? "")}
+            onChange={(t) => onOther!(t)}
+          />
+        )}
       </div>
       )}
     </motion.section>

@@ -33,3 +33,9 @@ STATUS.md
 sample.json
 evals/results/
 web/screenshots/
+
+# local run store
+specfork.db*
+
+# web UI bundled into the wheel by `make package`
+specfork/_web/

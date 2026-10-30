@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROMPT_VERSION = "2026-10-29.1"
+PROMPT_VERSION = "2026-10-30.2"
 
 FRAME_SYSTEM = """You prepare natural-language function specs for differential testing.
 Given a spec, produce:
@@ -71,9 +71,13 @@ by the open questions listed, anything the spec states explicitly, and trivia. F
 - "alternative_label": short sentence describing the most plausible alternative (max ~12 words)
 - "input_ids": ids of probe inputs whose output would change under the alternative (may be empty)
 - "alternative_example": one example call and the output the alternative would give, e.g. "f('03/04/2025') -> '2025-04-03'"
-Return an empty list if nothing important is left implicit. Reply with JSON only:
+- "confidence": 0.0-1.0, your probability that a real product owner would want to be asked this (1.0 = a
+  consequential, genuinely 50/50 decision; 0.3 = most owners would accept the default without thinking)
+Be conservative: most clear specs have NO silent assumptions worth asking about. Only include an assumption if
+at least one listed probe input's output would change. Return an empty list if nothing important is left
+implicit. Reply with JSON only:
 {"assumptions": [{"question": str, "why": str, "consensus_label": str, "alternative_label": str,
-                  "input_ids": [str], "alternative_example": str}]}"""
+                  "input_ids": [str], "alternative_example": str, "confidence": number}]}"""
 
 CLARIFY_SYSTEM = """You rewrite a function spec so it is unambiguous on the points the product owner decided.
 Input: the original spec, the owner's decisions (question -> chosen answer), and executed examples of the
@@ -133,3 +137,11 @@ def clarify_user(spec: str, decisions: list[dict[str, str]], chosen_code: str = 
     if chosen_code:
         out += f"\n\nChosen implementation (for your understanding only):\n```python\n{chosen_code[:2500]}\n```"
     return out
+
+
+def prompt_hash() -> str:
+    """Short hash of every prompt template, recorded in each run for reproducibility."""
+    import hashlib
+
+    texts = [v for k, v in sorted(globals().items()) if k.endswith("_SYSTEM") and isinstance(v, str)]
+    return hashlib.sha256("\n".join(texts).encode()).hexdigest()[:12]

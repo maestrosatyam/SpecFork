@@ -3,13 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, type Api } from "../api";
 import { DEFAULT_SAMPLES, MAX_SPEC_CHARS, SAMPLE_COUNTS } from "../config";
 import { formatDate, truncate } from "../lib/format";
-import type { Preset, RunSummary } from "../types";
+import { DEFAULT_PROVIDER_LABEL, modelsForRole, useLabels } from "../lib/models";
+import type { AvailableModel, CreateRunBody, Health, Preset, RunSummary } from "../types";
 import { HowItWorksSteps } from "./HowItWorks";
 import { IconAlert, IconArrowRight, IconChevron } from "./Icons";
 
 type ErrorInfo = { title: string; body: string; tone: "warn" | "danger" };
 
-export function describeCreateError(e: unknown): ErrorInfo {
+export function describeCreateError(e: unknown, provider: string = DEFAULT_PROVIDER_LABEL): ErrorInfo {
   if (e instanceof ApiError) {
     if (e.status === 429)
       return {
@@ -20,7 +21,7 @@ export function describeCreateError(e: unknown): ErrorInfo {
     if (e.status === 503)
       return {
         title: "Live inference isn't available right now",
-        body: `${e.detail || "The server has no Nebius Token Factory key configured."} You can still open a recorded sample run.`,
+        body: `${e.detail || `The server has no ${provider} key configured.`} You can still open a recorded sample run.`,
         tone: "warn",
       };
     if (e.status === 0) return { title: "Can't reach the server", body: e.detail, tone: "danger" };
@@ -84,6 +85,48 @@ function HeroExample() {
   );
 }
 
+/** Default registry key for a role: the one whose label matches the health default, else the first. */
+export function defaultModelKey(models: AvailableModel[], defaultLabel: string): string {
+  return (models.find((m) => m.label === defaultLabel) ?? models[0])?.key ?? "";
+}
+
+function ModelSelect({
+  id,
+  label,
+  hint,
+  models,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  models: AvailableModel[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label htmlFor={id} className="flex min-w-0 flex-col gap-1">
+      <span className="text-[13px] font-medium text-fog-300">
+        {label} <span className="font-normal text-fog-500">· {hint}</span>
+      </span>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border border-white/10 bg-ink-950/60 px-3 py-2 text-[14px] text-fog-100 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/25"
+      >
+        {models.map((m) => (
+          <option key={m.key} value={m.key}>
+            {m.label}
+            {m.provider_label ? ` (${m.provider_label})` : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function Composer({
   api,
   presets,
@@ -93,6 +136,7 @@ export function Composer({
   onOpenRun,
   initialSpec = "",
   liveDisabled = false,
+  health = null,
 }: {
   api: Api;
   presets: Preset[] | null;
@@ -102,7 +146,17 @@ export function Composer({
   onOpenRun: (id: string) => void;
   initialSpec?: string;
   liveDisabled?: boolean;
+  health?: Health | null;
 }) {
+  const labels = useLabels();
+  const fastModels = modelsForRole(labels.available, "fast");
+  const deepModels = modelsForRole(labels.available, "deep");
+  const [fastKey, setFastKey] = useState(() => defaultModelKey(fastModels, labels.fast));
+  const [deepKey, setDeepKey] = useState(() => defaultModelKey(deepModels, labels.deep));
+  const [assumptions, setAssumptions] = useState(true);
+  const fastDefault = defaultModelKey(fastModels, labels.fast);
+  const deepDefault = defaultModelKey(deepModels, labels.deep);
+  const advancedChanged = !assumptions || (fastKey && fastKey !== fastDefault) || (deepKey && deepKey !== deepDefault);
   const [spec, setSpec] = useState(initialSpec);
   const [presetId, setPresetId] = useState<string | undefined>();
   const [n, setN] = useState<number>(DEFAULT_SAMPLES);
@@ -126,10 +180,14 @@ export function Composer({
     setError(null);
     try {
       const matching = presets?.find((p) => p.id === presetId && p.spec.trim() === spec.trim());
-      const { id } = await api.createRun({ spec: spec.trim(), n_samples: n, preset_id: matching?.id });
+      const body: CreateRunBody = { spec: spec.trim(), n_samples: n, preset_id: matching?.id, assumptions };
+      // Only send model keys the server advertised, and only when the user picked a non-default one.
+      if (fastKey && fastKey !== fastDefault && fastModels.some((m) => m.key === fastKey)) body.fast_model = fastKey;
+      if (deepKey && deepKey !== deepDefault && deepModels.some((m) => m.key === deepKey)) body.deep_model = deepKey;
+      const { id } = await api.createRun(body);
       onCreated(id);
     } catch (e) {
-      setError(describeCreateError(e));
+      setError(describeCreateError(e, labels.provider));
       setBusy(false);
     }
   };
@@ -149,12 +207,12 @@ export function Composer({
           Your spec means more than one thing.
           <span className="block text-fog-400">Find out which, before your coding agent guesses.</span>
         </h1>
-        <p className="chip mt-4 md:hidden">
+        <p className="chip mt-4 xl:hidden">
           <span className="h-1.5 w-1.5 rounded-full bg-[#76b900]" aria-hidden />
-          Powered by NVIDIA Nemotron on Nebius Token Factory
+          Powered by {labels.family} on {labels.provider}
         </p>
         <p className="mt-5 max-w-[760px] text-[17px] leading-relaxed text-fog-300">
-          SpecFork has NVIDIA Nemotron write a couple of dozen independent implementations of your spec, runs them all,
+          SpecFork has {labels.fast} write a couple of dozen independent implementations of your spec, runs them all,
           and turns every disagreement into one concrete question. You answer, and you get a clarified spec, tests
           and a reference implementation.
         </p>
@@ -278,6 +336,55 @@ export function Composer({
               ))}
             </div>
           </fieldset>
+          <details className="group text-[14px] sm:mr-auto sm:ml-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-fog-400 hover:text-fog-100 [&::-webkit-details-marker]:hidden">
+              <IconChevron size={14} className="transition-transform group-open:rotate-90" />
+              Advanced
+              {advancedChanged && <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-label="changed from defaults" />}
+            </summary>
+            <div className="mt-2 grid gap-3 rounded-xl border border-white/[0.07] bg-ink-950/40 p-3 sm:min-w-[340px]">
+              {fastModels.length > 1 && (
+                <ModelSelect
+                  id="fast-model"
+                  label="Fast model"
+                  hint="framing, fan-out, re-fork"
+                  models={fastModels}
+                  value={fastKey}
+                  onChange={setFastKey}
+                />
+              )}
+              {deepModels.length > 1 && (
+                <ModelSelect
+                  id="deep-model"
+                  label="Deep model"
+                  hint="questions, assumptions, clarified spec"
+                  models={deepModels}
+                  value={deepKey}
+                  onChange={setDeepKey}
+                />
+              )}
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={assumptions}
+                  onChange={(e) => setAssumptions(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[#a5b4fc]"
+                />
+                <span>
+                  <span className="text-fog-100">Look for silent assumptions</span>
+                  <span className="block text-[12.5px] text-fog-500">
+                    Also ask about choices every implementation made that your spec never stated.
+                  </span>
+                </span>
+              </label>
+              {fastModels.length <= 1 && deepModels.length <= 1 && (
+                <p className="text-[12.5px] text-fog-500">
+                  Models: {labels.fast} (fast) · {labels.deep} (deep)
+                  {health?.public_demo ? " · fixed on this public demo" : ""}
+                </p>
+              )}
+            </div>
+          </details>
           <button type="submit" className="btn btn-primary px-6 py-3 text-[16px]" disabled={busy || over}>
             {busy ? (
               <>

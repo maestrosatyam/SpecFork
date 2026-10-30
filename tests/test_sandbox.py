@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from app import canon as canon_mod
-from app.sandbox import check_code, run_function
+from specfork import canon as canon_mod
+from specfork.sandbox import check_code, run_function
 
 GOOD = '''
 import math
@@ -19,10 +19,9 @@ def split_bill(total, n):
 
 
 def test_canon_in_harness_matches_module():
-    harness = Path("app/_harness.py").read_text()
+    harness = Path("specfork/_harness.py").read_text()
     h = re.search(r"def canon\(v, _depth=0\):.*?\n\n\n", harness, re.S).group(0)
     m = inspect.getsource(canon_mod.canon)
-    norm = lambda s: re.sub(r"\s+|#.*", "", s.replace("(str, bytes)", "str").replace("_math", "math"))  # noqa: E731
     # both must handle the same type branches
     for token in ["isinstance(v, bool)", "round(f, 9)", "isoformat", "sorted(", "timedelta"]:
         assert token in h and token in m
@@ -184,7 +183,7 @@ async def test_no_process_creation_in_child():
     import sys as _sys
     payload = {"code": "import os\ndef f(x):\n    return os.fork()\n", "func": "f", "inputs": [{"id": "a", "args": {"x": 1}}],
                "timeout": 1, "allowed_imports": ["os"]}
-    out = _sp.run([_sys.executable, "-I", "-S", "app/_harness.py"], input=_json.dumps(payload).encode(),
+    out = _sp.run([_sys.executable, "-I", "-S", "specfork/_harness.py"], input=_json.dumps(payload).encode(),
                   capture_output=True, env={"PATH": "/usr/bin:/bin"}, timeout=20).stdout
     res = _json.loads(out)
     assert res["outcomes"]["a"]["ok"] is False  # BlockingIOError / PermissionError from RLIMIT_NPROC

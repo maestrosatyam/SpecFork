@@ -9,11 +9,13 @@ RUN npm run build
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PORT=8080
 WORKDIR /srv
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-COPY app/ ./app/
+COPY pyproject.toml README.md LICENSE ./
+COPY specfork/ ./specfork/
+RUN pip install --no-cache-dir ".[server]"
 COPY --from=web /web/dist ./web/dist
-RUN useradd --create-home --uid 10001 specfork && mkdir -p /tmp/specfork-runs && chown specfork /tmp/specfork-runs
+RUN useradd --create-home --uid 10001 specfork
 USER specfork
+ENV SPECFORK_DB=/home/specfork/specfork.db
 EXPOSE 8080
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-server-header"]
+# exec form: the server is PID 1 and non-dumpable, no shell keeps the API key in its environment
+CMD ["uvicorn", "specfork.server.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8080", "--no-server-header", "--app-dir", "/srv"]

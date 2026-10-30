@@ -126,7 +126,7 @@ def main() -> int:
 
     out = {
         "probe": "nebius_token_factory_nvidia_nemotron",
-        "timestamp_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "timestamp_utc": dt.datetime.now(dt.UTC).isoformat(),
         "provider": "Nebius Token Factory (OpenAI-compatible chat completions)",
         "base_url": BASE_URL,
         "auth": "Bearer <redacted>",

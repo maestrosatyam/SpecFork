@@ -67,7 +67,9 @@ def make_transport(counter: dict | None = None) -> httpx.MockTransport:
             content = json.dumps({"assumptions": [{
                 "question": "Should a $0 bill be split at all?", "why": "Zero bills may be data errors.",
                 "consensus_label": "Everyone pays 0.0", "alternative_label": "Raise an error for a $0 bill",
-                "input_ids": ["i999", "i3"], "alternative_example": "split_bill(0, 2) -> raises"}]})
+                "input_ids": ["i999", "i3"], "alternative_example": "split_bill(0, 2) -> raises", "confidence": 0.9},
+                {"question": "Trivial?", "why": "", "consensus_label": "x", "alternative_label": "y",
+                 "input_ids": ["i1"], "alternative_example": "", "confidence": 0.2}]})
             reasoning = "All implementations return zeros."
         elif "requirements analyst" in system:
             content, reasoning = json.dumps(EXPLAIN), "Group g0 sums to total; others lose or add cents."
@@ -94,3 +96,11 @@ def make_transport(counter: dict | None = None) -> httpx.MockTransport:
                                          "usage": {"prompt_tokens": 100, "completion_tokens": 50}})
 
     return httpx.MockTransport(handler)
+
+
+def make_router(transport: httpx.MockTransport | None = None, key: str = "test", **kw):
+    """ModelRouter over the built-in registry with a scripted transport (no network)."""
+    from specfork.llm import ModelRouter
+    from specfork.registry import Registry
+
+    return ModelRouter(Registry.load(), {"NEBIUS_API_KEY": key}, transport=transport or make_transport(), **kw)

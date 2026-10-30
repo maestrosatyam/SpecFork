@@ -1,0 +1,70 @@
+name: SpecFork ambiguity check
+description: Fork function specs into independent implementations, comment the decisions they disagree on (with executed witnesses), and lock pytest tests once the answers are committed.
+author: Satyam Dwivedi
+branding:
+  icon: git-branch
+  color: blue
+inputs:
+  specs:
+    description: Space-separated globs of spec files (one function spec per file).
+    default: "specs/*.md"
+  state-dir:
+    description: Directory where runs and answers files are stored (commit it).
+    default: ".specfork"
+  tests-dir:
+    description: Directory for the locked pytest files.
+    default: "tests/specfork"
+  module:
+    description: Python module the generated tests import the function from.
+    default: "solution"
+  n-samples:
+    description: Implementations per spec.
+    default: "16"
+  fail-on-open:
+    description: Fail the check while questions are unanswered ("true"/"false").
+    default: "true"
+  comment:
+    description: Post the report as a pull-request comment ("true"/"false"; needs pull-requests write permission).
+    default: "true"
+  nebius-api-key:
+    description: API key for the default NVIDIA Nemotron profiles on Nebius Token Factory (or set the key your specfork.toml profiles use as an env var).
+    required: false
+outputs:
+  report:
+    description: Path of the Markdown report.
+    value: ${{ steps.run.outputs.report }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install SpecFork
+      shell: bash
+      run: python -m pip install --quiet "${{ github.action_path }}"
+    - name: Run specfork ci
+      id: run
+      shell: bash
+      env:
+        NEBIUS_API_KEY: ${{ inputs.nebius-api-key }}
+      run: |
+        set +e
+        report="$RUNNER_TEMP/specfork-report.md"
+        fail=""
+        [ "${{ inputs.fail-on-open }}" = "true" ] && fail="--fail-on-open"
+        # GitHub-hosted Linux runners allow unprivileged user namespaces, so the sandbox keeps network isolation.
+        specfork ci ${{ inputs.specs }} -n "${{ inputs.n-samples }}" --state "${{ inputs.state-dir }}" \
+          --out "${{ inputs.tests-dir }}" --module "${{ inputs.module }}" --comment-file "$report" $fail
+        code=$?
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+        cat "$report" >> "$GITHUB_STEP_SUMMARY"
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh pr comment "${{ github.event.pull_request.number }}" --body-file "${{ steps.run.outputs.report }}" --repo "${{ github.repository }}"
+    - name: Propagate result
+      shell: bash
+      run: exit "${{ steps.run.outputs.code }}"

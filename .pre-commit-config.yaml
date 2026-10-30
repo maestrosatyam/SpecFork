@@ -1,0 +1,23 @@
+# Install with:  uvx pre-commit install
+# Keep the ruff `rev` below in sync with the ruff version locked in uv.lock
+# (`uv tree --package ruff` or `grep -A1 'name = "ruff"' uv.lock`); bump both together.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+exclude: ^(web/package-lock\.json|uv\.lock|evals/benchmark/specs\.json|docs/results/)

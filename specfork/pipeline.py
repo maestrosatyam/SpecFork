@@ -1,31 +1,39 @@
 """SpecFork orchestration: frame → fan-out → execute → cluster → explain → resolve → converge.
 
-Model roles (all NVIDIA open models served by Nebius Token Factory):
-  * fast model (Nemotron 3.5 Lightning): framing, many independent implementations (cheap, high throughput)
-  * deep model (Nemotron 3 Ultra, reasoning on): explaining disagreements, rewriting the spec
+Model roles (profiles from the registry; defaults: NVIDIA Nemotron on Nebius Token Factory):
+  * fast model (default NVIDIA Nemotron 3.5 Lightning): framing, many independent implementations (cheap, high throughput)
+  * deep model (default NVIDIA Nemotron 3 Ultra, reasoning on): explaining disagreements, rewriting the spec
 Everything that decides (clustering, witnesses, tests, agreement) is deterministic code.
 """
 from __future__ import annotations
 
 import asyncio
-import os
 import hashlib
 import json
 import random
 import re
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from . import prompts
 from .canon import canon
 from .cluster import agreement, cluster_impls, find_axes, outcome_key, surviving_clusters
-from .llm import MODEL_DEEP, MODEL_FAST, CallRecord, LLMError, NebiusClient, extract_json
+from .llm import CallRecord, LLMError, ModelRouter, extract_json
 from .sandbox import check_code, exec_semaphore, run_function
 
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,40}$")
 MAX_INPUTS = 24
 CONSENSUS_SHARE = 0.75
-FRAME_THINKING = os.environ.get("FRAME_THINKING", "0") == "1"
+ASSUMPTION_MIN_CONFIDENCE = 0.6
+MAX_ASSUMPTIONS = 2
+
+
+def _conf(a: dict[str, Any]) -> float:
+    try:
+        return max(0.0, min(1.0, float(a.get("confidence", 0.0))))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 class PipelineError(RuntimeError):
@@ -38,14 +46,21 @@ def now() -> float:
     return round(time.time(), 3)
 
 
+DEFAULT_FAST = "nvidia/Nemotron-3_5-Lightning"
+DEFAULT_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
+
+
 def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None,
-            fast_model: str = MODEL_FAST, deep_model: str = MODEL_DEEP) -> dict[str, Any]:
+            fast_model: str = DEFAULT_FAST, deep_model: str = DEFAULT_DEEP, *,
+            implementers: list[str] | None = None, assumptions: bool = True) -> dict[str, Any]:
+    """A fresh run record. Model arguments are model ids (or registry keys) resolved by the ModelRouter."""
     t = now()
     return {
         "id": run_id, "created_at": t, "updated_at": t, "status": "running", "stage": "frame",
         "spec": spec, "preset_id": preset_id, "is_sample": False,
         "settings": {"n_samples": n_samples, "fast_model": fast_model, "deep_model": deep_model,
-                     "prompt_version": prompts.PROMPT_VERSION},
+                     "implementers": list(implementers or [fast_model]), "assumptions": assumptions,
+                     "prompt_version": prompts.PROMPT_VERSION, "prompt_hash": prompts.prompt_hash()},
         "inputs": [], "implementations": [], "clusters": [], "questions": [], "trace": [],
         "metrics": {"total_cost_usd": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "n_calls": 0, "wall_time_s": 0.0},
         "log": [],
@@ -166,7 +181,7 @@ def add_trace(run: dict[str, Any], rec: CallRecord, reasoning: str = "") -> None
     m["total_cost_usd"] = round(m["total_cost_usd"] + rec.cost_usd, 7)
 
 
-def render_tests(sig: dict[str, Any], cases: list[dict[str, Any]], spec: str) -> str:
+def render_tests(sig: dict[str, Any], cases: list[dict[str, Any]], spec: str, module: str = "solution") -> str:
     """Deterministic pytest file: compares canonical forms, so it is robust to 3 vs 3.0 and tuple vs list."""
     import inspect
 
@@ -193,7 +208,7 @@ import math as _math
 
 import pytest
 
-from solution import {fname}  # noqa: E402  (put your implementation in solution.py)
+from {module} import {fname}  # noqa: E402
 
 RAISES = "raises"
 
@@ -219,7 +234,11 @@ def test_{fname}(args_json, expected):
 # ---------------------------------------------------------------- pipeline
 
 class SpecFork:
-    def __init__(self, client: NebiusClient, notify: Callable[[dict[str, Any]], None]) -> None:
+    def __init__(self, client: ModelRouter, notify: Callable[[dict[str, Any]], None], *, frame_thinking: bool = False,
+                 assumption_min_confidence: float = ASSUMPTION_MIN_CONFIDENCE, max_assumptions: int = MAX_ASSUMPTIONS) -> None:
+        self.frame_thinking = frame_thinking
+        self.assumption_min_confidence = assumption_min_confidence
+        self.max_assumptions = max_assumptions
         self.client = client
         self.notify = notify
 
@@ -241,13 +260,13 @@ class SpecFork:
         return res
 
     async def _json_call(self, run, purpose, system, user, *, model, thinking, max_tokens, temperature=0.3, retries=1,
-                         template_kwargs=None, fallback_no_thinking=False):
+                         effort=None, fallback_no_thinking=False):
         last: Exception | None = None
         for attempt in range(retries + 1):
             think = thinking and not (fallback_no_thinking and attempt > 0)
             res = await self._chat(run, purpose, [{"role": "system", "content": system}, {"role": "user", "content": user}],
                                    model=model, thinking=think, max_tokens=max_tokens, temperature=temperature,
-                                   template_kwargs=template_kwargs if think else None)
+                                   effort=effort if think else None, json_mode=True)
             try:
                 return extract_json(res.content)
             except ValueError as e:
@@ -271,7 +290,7 @@ class SpecFork:
         fixed = run.get("signature")
         system = prompts.FRAME_INPUTS_SYSTEM if fixed else prompts.FRAME_SYSTEM
         raw = await self._json_call(run, "frame", system, prompts.frame_user(run["spec"], fixed),
-                                    model=run["settings"]["fast_model"], thinking=FRAME_THINKING, max_tokens=8000, temperature=0.4,
+                                    model=run["settings"]["fast_model"], thinking=self.frame_thinking, max_tokens=8000, temperature=0.4,
                                     fallback_no_thinking=True)
         sig = validate_signature(fixed) if fixed else validate_signature(raw)
         model_inputs = validate_inputs(raw.get("inputs") or [], sig, "model")
@@ -318,7 +337,8 @@ class SpecFork:
     async def fanout(self, run: dict[str, Any]) -> None:
         run["stage"] = "fanout"
         n = run["settings"]["n_samples"]
-        run["implementations"] = [{"id": f"m{k}", "index": k, "model": run["settings"]["fast_model"], "status": "pending"}
+        implementers = run["settings"].get("implementers") or [run["settings"]["fast_model"]]
+        run["implementations"] = [{"id": f"m{k}", "index": k, "model": implementers[k % len(implementers)], "status": "pending"}
                                   for k in range(n)]
         self._log(run, "fanout", f"Requesting {n} independent implementations from {run['settings']['fast_model']}")
         base = int(hashlib.sha256(run["spec"].encode()).hexdigest()[:6], 16)
@@ -389,7 +409,7 @@ class SpecFork:
             raw = await self._json_call(run, "explain", prompts.EXPLAIN_SYSTEM,
                                         prompts.explain_user(run["spec"], run["signature"], axes_payload, clusters_payload),
                                         model=run["settings"]["deep_model"], thinking=True, max_tokens=16000, temperature=0.6,
-                                        template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
+                                        effort="medium", fallback_no_thinking=True)
         except (LLMError, PipelineError) as e:
             self._log(run, "explain", f"Explainer unavailable ({str(e)[:80]}); using raw witness questions")
             raw = {"axes": []}
@@ -399,7 +419,7 @@ class SpecFork:
                 by_label[lab]["summary"] = str(summ)[:160]
         expl = {a.get("axis_id"): a for a in raw.get("axes") or [] if isinstance(a, dict)}
         questions = []
-        for k, (ax, gmap) in enumerate(zip(axes, group_maps)):
+        for k, (ax, gmap) in enumerate(zip(axes, group_maps, strict=False)):
             e = expl.get(f"x{k}") or {}
             if e.get("merge_into") and any(q["id"] == f"q{e['merge_into'][1:]}" for q in questions):
                 continue
@@ -442,6 +462,8 @@ class SpecFork:
 
     async def assumptions(self, run: dict[str, Any]) -> None:
         """Ask the deep model which consequential decisions every (or the majority) implementation made silently."""
+        if not run["settings"].get("assumptions", True):
+            return
         live = [c for c in run["clusters"] if c["kind"] == "behavior"]
         if not live:
             return
@@ -458,16 +480,22 @@ class SpecFork:
                                         prompts.assume_user(run["spec"], run["signature"], rep.get("code") or "", outputs,
                                                             major["size"], n_total, open_qs),
                                         model=run["settings"]["deep_model"], thinking=True, max_tokens=12000, temperature=0.5,
-                                        template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
+                                        effort="medium", fallback_no_thinking=True)
         except (LLMError, PipelineError) as e:
             self._log(run, "explain", f"Assumption review unavailable ({str(e)[:80]})")
             return
         valid_ids = {i["id"] for i in run["inputs"]}
         added = 0
-        for k, a in enumerate((raw.get("assumptions") or [])[:3]):
-            if not isinstance(a, dict) or not a.get("question") or not a.get("alternative_label"):
+        cands = [a for a in (raw.get("assumptions") or []) if isinstance(a, dict)]
+        cands.sort(key=lambda a: -_conf(a))
+        for k, a in enumerate(cands):
+            if added >= self.max_assumptions:
+                break
+            if not a.get("question") or not a.get("alternative_label") or _conf(a) < self.assumption_min_confidence:
                 continue
             affected = [i for i in (a.get("input_ids") or []) if isinstance(i, str) and i in valid_ids]
+            if not affected:
+                continue  # must be backed by at least one executed probe whose output would change
             # clusters that behave like the majority on the affected inputs keep the assumption
             keep_ids = [c["id"] for c in live
                         if all(outcome_key(impls[c["representative_impl_id"]]["outcomes"].get(i)) == outcome_key(rep["outcomes"].get(i))
@@ -477,7 +505,7 @@ class SpecFork:
                 "id": qid, "kind": "assumption",
                 "text": str(a["question"])[:300], "why": str(a.get("why") or "")[:300],
                 "witness_input_ids": affected[:3], "affected_input_ids": affected,
-                "agree_count": sum(c["size"] for c in live if c["id"] in keep_ids),
+                "agree_count": sum(c["size"] for c in live if c["id"] in keep_ids), "confidence": round(_conf(a), 2),
                 "options": [
                     {"id": f"{qid}keep", "label": humanize_label(str(a.get("consensus_label") or "Keep the current behaviour"))[:140],
                      "cluster_ids": keep_ids, "impl_count": sum(c["size"] for c in live if c["id"] in keep_ids),
@@ -508,14 +536,31 @@ class SpecFork:
             self._log(run, run["stage"], "Ready for your answers" if run["status"] == "awaiting_answers" else f"Stopped: {run.get('error')}")
 
     # ---- resolve
-    async def resolve(self, run: dict[str, Any], answers: dict[str, str]) -> None:
+    async def resolve(self, run: dict[str, Any], answers: dict[str, str], other: dict[str, str] | None = None) -> None:
+        """Apply the owner's answers. ``answers`` maps question id -> option id; ``other`` maps question id ->
+        free text for answers no sampled implementation produced (the deep model implements them, and the
+        implementation is executed so the custom answer is backed by real outputs like every other option)."""
         t0 = time.perf_counter()
+        other = {k: v for k, v in (other or {}).items() if v}
         try:
             qs = {q["id"]: q for q in run["questions"]}
+            unknown = (set(answers) | set(other)) - set(qs)
+            if unknown:
+                raise PipelineError(f"{len(unknown)} unknown question id(s)")
+            sig_name = run["signature"]["name"]
+            inputs = {i["id"]: i for i in run["inputs"]}
             chosen_sets, decisions = [], []
             overrides: set[str] = set()
+            custom_qs: list[dict[str, Any]] = []
             for q in run["questions"]:
-                oid = answers.get(q["id"]) or q.get("answer_option_id")
+                # drop a custom option from an earlier resolution of this run
+                q["options"] = [o for o in q["options"] if not o.get("is_custom")]
+                if q["id"] in other and q["kind"] in ("ambiguity", "assumption"):
+                    custom_qs.append(q)  # its executed implementation reflects the answer: nothing to unlock
+                    decisions.append({"question": q["text"], "answer": other[q["id"]],
+                                      "note": "Free-text answer from the product owner; no sampled implementation did this."})
+                    continue
+                oid = answers.get(q["id"]) or (q.get("answer_option_id") if q["kind"] == "likely_bug" else None)
                 opt = next((o for o in q["options"] if o["id"] == oid), None)
                 if opt is None:
                     if q["kind"] in ("ambiguity", "assumption"):
@@ -533,27 +578,72 @@ class SpecFork:
                 if not opt["examples"]:
                     decisions.append({"question": q["text"], "answer": opt["label"]})
                     continue
-                ex = opt["examples"][0]
+                ex0 = opt["examples"][0]
                 decisions.append({"question": q["text"], "answer": opt["label"],
-                                  "example": f"{run['signature']['name']}(**{json.dumps(next(i for i in run['inputs'] if i['id'] == ex['input_id'])['args'])}) -> {ex['value_repr']}"})
-            unknown = set(answers) - set(qs)
-            if unknown:
-                raise PipelineError(f"{len(unknown)} unknown question id(s)")
+                                  "example": f"{sig_name}(**{json.dumps(inputs[ex0['input_id']]['args'])}) -> {ex0['value_repr']}"})
             surv, exact = surviving_clusters(run["clusters"], chosen_sets)
             clusters = {c["id"]: c for c in run["clusters"]}
             best = max(surv, key=lambda c: clusters[c]["size"])
-            chosen_impl = next(i for i in run["implementations"] if i["id"] == clusters[best]["representative_impl_id"])
-            inputs = {i["id"]: i for i in run["inputs"]}
-            ex = {i["id"]: i["outcomes"] for i in run["implementations"] if i["status"] == "executed"}
-            # Lock only what was decided (witnesses of answered questions) or what the original
-            # implementations already agreed on (>= 75%). Split cases nobody asked about stay open.
-            decided = {w for q in run["questions"] if q.get("answer_option_id") and q["kind"] != "likely_bug"
-                       and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])
-                       for w in q["witness_input_ids"]}
+            base_impl = next(i for i in run["implementations"] if i["id"] == clusters[best]["representative_impl_id"])
+            ex = {i["id"]: i["outcomes"] for i in run["implementations"]
+                  if i["status"] == "executed" and not i["id"].startswith("u")}
+            custom_ids = {q["id"] for q in custom_qs}
+            decided_option_ids = {q["id"] for q in run["questions"] if q["kind"] != "likely_bug" and q["id"] not in custom_ids
+                                  and q.get("answer_option_id")
+                                  and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])}
+            witness_ids = [w for q in run["questions"] if q["id"] in decided_option_ids for w in q["witness_input_ids"]]
+            run["status"] = "resolving"
+
+            # 1. clarified spec (encodes only the decided points)
+            clarified = run["spec"]
+            if decisions:
+                examples = [f"{sig_name}(**{json.dumps(inputs[i]['args'])}) -> {outcome_key(base_impl['outcomes'].get(i))}"
+                            for i in dict.fromkeys(witness_ids) if i not in overrides][:10]
+                try:
+                    raw = await self._json_call(run, "clarify", prompts.CLARIFY_SYSTEM,
+                                                prompts.clarify_user(run["spec"], decisions, "", examples),
+                                                model=run["settings"]["deep_model"], thinking=True, max_tokens=10000,
+                                                temperature=0.3, effort="medium", fallback_no_thinking=True)
+                    clarified = str(raw.get("clarified_spec") or "").strip() or clarified
+                    decision_lines = [str(d)[:240] for d in (raw.get("decisions") or [])][:8]
+                except (LLMError, PipelineError) as e:
+                    clarified = run["spec"].strip() + "\n\nDecisions:\n" + "\n".join(f"- {d['question']} {d['answer']}" for d in decisions)
+                    decision_lines = []
+                    self._log(run, "resolve", f"Clarifier unavailable ({str(e)[:60]}); appended decisions verbatim")
+            else:
+                decision_lines = []
+
+            # 2. reference implementation: the chosen cluster, or a new executed implementation of custom answers
+            chosen_impl = base_impl
+            if custom_qs:
+                self._log(run, "resolve", f"Implementing your own answer(s) with {run['settings']['deep_model']} and executing them")
+                custom = None
+                for k, model in enumerate((run["settings"]["deep_model"], run["settings"]["fast_model"])):
+                    impl = {"id": f"u{k}", "index": len(run["implementations"]), "model": model, "status": "pending"}
+                    seed = int(hashlib.sha256(clarified.encode()).hexdigest()[:6], 16)
+                    await self._one_impl(run, impl, clarified, run["inputs"], seed, "implement_custom")
+                    if impl["status"] == "executed":
+                        custom = impl
+                        break
+                if custom is None:
+                    raise PipelineError("could not turn your free-text answer into a working implementation; "
+                                        "try rephrasing it or pick one of the options")
+                run["implementations"].append(custom)
+                chosen_impl = custom
+                for q in custom_qs:
+                    opt = {"id": f"{q['id']}other", "label": other[q["id"]][:140], "is_custom": True, "cluster_ids": [],
+                           "impl_count": 0,
+                           "examples": [{"input_id": w, "value_repr": outcome_key(custom["outcomes"].get(w))}
+                                        for w in (q["witness_input_ids"] or q.get("affected_input_ids") or [])[:3]]}
+                    q["options"].append(opt)
+                    q["answer_option_id"] = opt["id"]
+
+            # 3. lock only what was decided or what the original implementations already agreed on (>= 75%)
+            decided = set(witness_ids) | {w for q in custom_qs for w in (q["witness_input_ids"] or [])}
             locked, left_open = [], []
             for iid, o in chosen_impl["outcomes"].items():
                 if iid in overrides:
-                    continue
+                    continue  # an overridden assumption: no implementation produced the wanted output
                 key = outcome_key(o)
                 share = sum(1 for per in ex.values() if outcome_key(per.get(iid)) == key) / max(1, len(ex))
                 if iid in decided or share >= CONSENSUS_SHARE:
@@ -563,40 +653,20 @@ class SpecFork:
                     left_open.append(iid)
             expected = {c["input_id"]: c["expected_repr"] for c in locked}
             passed, n = agreement(ex, expected)
-            run["status"] = "resolving"
             run["resolution"] = {
                 "answers": {q["id"]: q.get("answer_option_id") for q in run["questions"]},
                 "surviving_cluster_ids": surv, "exact_match": exact, "chosen_impl_id": chosen_impl["id"],
-                "clarified_spec": "", "decisions": [f"{d['question']} → {d['answer']}" for d in decisions],
-                "tests_code": "", "reference_code": chosen_impl["code"], "locked_cases": locked,
+                "custom_impl_id": chosen_impl["id"] if custom_qs else None,
+                "clarified_spec": clarified,
+                "decisions": decision_lines or [f"{d['question']} → {d['answer']}" for d in decisions],
+                "tests_code": render_tests(run["signature"], locked, clarified), "reference_code": chosen_impl["code"],
+                "locked_cases": locked,
                 "agreement_before": round(passed / n, 4) if n else 0.0, "agreement_before_counts": [passed, n],
-                "unlocked_input_ids": sorted(overrides),
-                "open_input_ids": left_open,
+                "unlocked_input_ids": sorted(overrides), "open_input_ids": left_open,
             }
-            self._log(run, "resolve", f"Chosen behaviour {clusters[best]['label']}: {passed}/{n} original implementations already matched it")
-            clarified = run["spec"]
-            if decisions:
-                try:
-                    sig_name = run["signature"]["name"]
-                    witness_ids = [w for q in run["questions"] if q.get("answer_option_id") and q["kind"] != "likely_bug"
-                                   and not any(o.get("is_alternative") and o["id"] == q["answer_option_id"] for o in q["options"])
-                                   for w in q["witness_input_ids"]]
-                    by_id = {c["input_id"]: c for c in locked}
-                    examples = [f"{sig_name}(**{json.dumps(by_id[i]['args'])}) -> {by_id[i]['expected_repr']}"
-                                for i in dict.fromkeys(witness_ids) if i in by_id][:10]
-                    raw = await self._json_call(run, "clarify", prompts.CLARIFY_SYSTEM,
-                                                prompts.clarify_user(run["spec"], decisions, "", examples),
-                                                model=run["settings"]["deep_model"], thinking=True, max_tokens=10000, temperature=0.3,
-                                                template_kwargs={"medium_effort": True}, fallback_no_thinking=True)
-                    clarified = str(raw.get("clarified_spec") or "").strip() or clarified
-                    if raw.get("decisions"):
-                        run["resolution"]["decisions"] = [str(d)[:240] for d in raw["decisions"]][:8]
-                except (LLMError, PipelineError) as e:
-                    clarified = run["spec"].strip() + "\n\nDecisions:\n" + "\n".join(f"- {d['question']} {d['answer']}" for d in decisions)
-                    self._log(run, "resolve", f"Clarifier unavailable ({str(e)[:60]}); appended decisions verbatim")
-            run["resolution"]["clarified_spec"] = clarified
-            run["resolution"]["tests_code"] = render_tests(run["signature"], locked, clarified)
             run["status"] = "resolved"
+            label = "your own answer" if custom_qs else f"behaviour {clusters[best]['label']}"
+            self._log(run, "resolve", f"Chosen {label}: {passed}/{n} original implementations already matched it")
             self._log(run, "resolve", f"Locked {len(locked)} executable test cases ({len(left_open)} undecided case(s) left open)")
         except PipelineError as e:
             run["status"] = "awaiting_answers"
@@ -615,7 +685,9 @@ class SpecFork:
         conv = res["convergence"]
         self._log(run, "converge", f"Re-forking the clarified spec: {n_samples} fresh implementations")
         try:
-            impls = [{"id": f"r{k}", "index": k, "model": run["settings"]["fast_model"], "status": "pending"} for k in range(n_samples)]
+            implementers = run["settings"].get("implementers") or [run["settings"]["fast_model"]]
+            impls = [{"id": f"r{k}", "index": k, "model": implementers[k % len(implementers)], "status": "pending"}
+                     for k in range(n_samples)]
             conv["implementations"] = impls
             base = int(hashlib.sha256(res["clarified_spec"].encode()).hexdigest()[:6], 16)
             await asyncio.gather(*(self._one_impl(run, impl, res["clarified_spec"], run["inputs"], base + impl["index"], "reimplement")

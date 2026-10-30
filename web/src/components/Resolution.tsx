@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import type { Api } from "../api";
 import { wordDiff } from "../lib/diff";
 import { formatPct } from "../lib/format";
-import type { Convergence, Run } from "../types";
+import type { Convergence, Implementation, Run } from "../types";
 import { CodeBlock, CopyButton } from "./CodeBlock";
 import { CountUpPct } from "./CountUp";
 import { IconAlert, IconArrowRight, IconCheck, IconCode, IconDownload, IconRefresh, IconX } from "./Icons";
@@ -35,12 +35,43 @@ export function SpecDiff({ before, after }: { before: string; after: string }) {
   );
 }
 
-function CodeTabs({ api, run }: { api: Api; run: Run }) {
+/** "N undecided case(s) left open (no question covered them)", or null. */
+export function openCasesNote(openIds: string[] | undefined): string | null {
+  const n = openIds?.length ?? 0;
+  if (!n) return null;
+  return `${n} undecided case${n === 1 ? "" : "s"} left open (no question covered them)`;
+}
+
+export function customImplNote(deepLabel: string): string {
+  return `Reference implementation written from your own answer by ${deepLabel} and executed on every probe`;
+}
+
+function CodeTabs({ api, run, deepLabel }: { api: Api; run: Run; deepLabel: string }) {
   const r = run.resolution!;
   const [tab, setTab] = useState<"tests" | "ref">("tests");
+  const openNote = openCasesNote(r.open_input_ids);
   const tabs = [
-    { id: "tests" as const, label: "tests.py", sub: `${r.locked_cases.length} locked cases · pytest`, code: r.tests_code },
-    { id: "ref" as const, label: "reference.py", sub: "Implementation matching your answers", code: r.reference_code },
+    {
+      id: "tests" as const,
+      label: "tests.py",
+      sub: (
+        <>
+          {r.locked_cases.length} locked cases · pytest
+          {openNote && (
+            <span className="ml-2 inline-flex items-center gap-1 text-warn" title={`Open inputs: ${r.open_input_ids!.join(", ")}`}>
+              <IconAlert size={13} /> {openNote}
+            </span>
+          )}
+        </>
+      ),
+      code: r.tests_code,
+    },
+    {
+      id: "ref" as const,
+      label: "reference.py",
+      sub: r.custom_impl_id ? `${customImplNote(deepLabel)}.` : "Implementation matching your answers",
+      code: r.reference_code,
+    },
   ];
   const cur = tabs.find((t) => t.id === tab)!;
   return (
@@ -292,6 +323,9 @@ export function ResolutionView({
   error,
   onConverge,
   convergeLabel,
+  deepLabel,
+  customImpl,
+  onOpenImpl,
 }: {
   api: Api;
   run: Run;
@@ -299,8 +333,12 @@ export function ResolutionView({
   error: string | null;
   onConverge: () => void;
   convergeLabel?: string;
+  deepLabel: string;
+  customImpl?: Implementation;
+  onOpenImpl?: (impl: Implementation) => void;
 }) {
   const r = run.resolution!;
+  const openNote = openCasesNote(r.open_input_ids);
   return (
     <div className="space-y-6">
       <div className="grid gap-6 2xl:grid-cols-[1.15fr_1fr]">
@@ -327,6 +365,26 @@ export function ResolutionView({
               </span>
             </p>
           )}
+          {r.custom_impl_id && (
+            <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-accent/25 bg-accent/[0.06] px-3.5 py-2.5 text-[14px] leading-snug text-fog-200">
+              <IconCheck size={16} className="shrink-0 text-accent-strong" />
+              <span>{customImplNote(deepLabel)}.</span>
+              {customImpl && onOpenImpl && (
+                <button type="button" className="btn btn-quiet px-2 py-0.5 text-[13px] text-accent" onClick={() => onOpenImpl(customImpl)}>
+                  View outcomes <IconArrowRight size={14} />
+                </button>
+              )}
+            </p>
+          )}
+          <p className="mt-4 text-[13.5px] text-fog-400">
+            <span className="font-semibold tabular-nums text-fog-200">{r.locked_cases.length}</span> locked case
+            {r.locked_cases.length === 1 ? "" : "s"}
+            {openNote && (
+              <span className="ml-2 inline-flex items-center gap-1 text-warn">
+                <IconAlert size={13} /> {openNote}
+              </span>
+            )}
+          </p>
           <h3 className="eyebrow mt-7">Decisions</h3>
           <ul className="mt-3 space-y-2.5">
             {r.decisions.map((d, i) => (
@@ -341,7 +399,7 @@ export function ResolutionView({
         </section>
         <AgreementPanel run={run} busy={busy} error={error} onConverge={onConverge} convergeLabel={convergeLabel} />
       </div>
-      <CodeTabs api={api} run={run} />
+      <CodeTabs api={api} run={run} deepLabel={deepLabel} />
     </div>
   );
 }

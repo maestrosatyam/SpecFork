@@ -1,0 +1,78 @@
+name: Bug report
+description: Something in SpecFork behaves incorrectly (pipeline, sandbox, web UI, CLI, MCP server, evals).
+title: "[bug] "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+        **Security issues (especially sandbox escapes) must not be filed here.** Please report them privately,
+        see [SECURITY.md](https://github.com/maestrosatyam/SpecFork/blob/main/SECURITY.md).
+        Never paste API keys, `.env` contents or other secrets into an issue.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Pipeline (framing, fan-out, clustering, resolve, re-fork)
+        - Sandbox / code execution
+        - Web UI
+        - HTTP API / server
+        - CLI (`specfork`)
+        - MCP server
+        - Model provider profiles (`models.toml`)
+        - Benchmark / evals
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, and what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps. If a spec triggers it, paste the spec text and the run options (N, models, preset).
+      placeholder: |
+        1. `uv run specfork ...`
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or logs
+      description: Tracebacks, server logs, or browser console output. Redact anything sensitive.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: SpecFork version or commit
+      placeholder: "0.1.0 or a commit SHA"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Node version (for web issues), browser, Docker or local, model provider.
+      placeholder: |
+        - OS: Ubuntu 24.04
+        - Python: 3.12.x
+        - Node: 22.x
+        - Provider: Nebius Token Factory
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go through private reporting).
+          required: true

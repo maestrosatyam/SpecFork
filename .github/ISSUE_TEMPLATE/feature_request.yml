@@ -1,0 +1,51 @@
+name: Feature request
+description: Suggest an improvement or a new capability for SpecFork.
+title: "[feature] "
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SpecFork follows one principle: **code decides, the model explains.** Proposals that move a decision
+        (clustering, test generation, which behaviour survives) from executed code into a model call need a
+        strong justification. New model providers usually only need a profile in `specfork/models.toml`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should SpecFork do? Include API, CLI or UI sketches if useful.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Pipeline
+        - Sandbox
+        - Web UI
+        - HTTP API / server
+        - CLI
+        - MCP server
+        - Model provider profiles
+        - Presets
+        - Benchmark / evals
+        - Docs
+        - Other
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would be willing to open a pull request for this.

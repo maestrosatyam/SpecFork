@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { detectApi, type Api } from "./api";
 import { Composer } from "./components/Composer";
 import { Header } from "./components/Header";
 import { HowItWorksModal } from "./components/HowItWorks";
 import { RunView } from "./components/RunView";
+import { LabelsContext, labelsFromHealth } from "./lib/models";
 import { runHash, useHashRoute } from "./lib/route";
 import type { Health, Preset, RunSummary } from "./types";
 
@@ -16,6 +17,7 @@ export function App() {
   const [recent, setRecent] = useState<RunSummary[]>([]);
   const [howOpen, setHowOpen] = useState(false);
   const [draft, setDraft] = useState<{ spec: string; key: number }>({ spec: "", key: 0 });
+  const labels = useMemo(() => labelsFromHealth(health), [health]);
 
   useEffect(() => {
     detectApi().then(({ api, health }) => {
@@ -45,11 +47,12 @@ export function App() {
   }, [route]);
 
   return (
+    <LabelsContext.Provider value={labels}>
     <div className="min-h-screen">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-fog-50 focus:px-3 focus:py-2 focus:text-ink-900">
         Skip to content
       </a>
-      <Header onHome={() => go("#/")} onHowItWorks={() => setHowOpen(true)} mode={api?.mode ?? null} />
+      <Header onHome={() => go("#/")} onHowItWorks={() => setHowOpen(true)} mode={api?.mode ?? null} health={health} />
       <div id="main">
         {!api ? (
           <div className="flex h-[60vh] items-center justify-center" aria-busy="true">
@@ -74,6 +77,7 @@ export function App() {
             presetsError={presetsError}
             recent={recent}
             initialSpec={draft.spec}
+            health={health}
             liveDisabled={api.mode === "live" && health?.llm_configured === false}
             onCreated={(id) => go(runHash(id))}
             onOpenRun={(id) => go(runHash(id))}
@@ -81,9 +85,10 @@ export function App() {
         )}
       </div>
       <footer className="border-t border-white/[0.06] py-8 text-center text-[13px] text-fog-500">
-        SpecFork · built for the Nebius × NVIDIA Global AI Hackathon 2026 · inference by NVIDIA Nemotron on Nebius Token Factory
+        SpecFork · built for the Nebius × NVIDIA Global AI Hackathon 2026 · inference by {labels.family} on {labels.provider}
       </footer>
       <HowItWorksModal open={howOpen} onClose={() => setHowOpen(false)} />
     </div>
+    </LabelsContext.Provider>
   );
 }

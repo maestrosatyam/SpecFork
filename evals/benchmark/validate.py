@@ -44,7 +44,7 @@ def _alarm(signum, frame):  # pragma: no cover - only fires on runaway code
 
 def load_function(src: str, name: str):
     ns: dict = {"__name__": f"bench_{name}"}
-    exec(compile(src, f"<{name}>", "exec"), ns)
+    exec(compile(src, f"<{name}>", "exec"), ns)  # noqa: S102 - trusted, hand-written benchmark references
     fn = ns.get(name)
     if not callable(fn):
         raise AssertionError(f"code does not define function {name!r}")

@@ -2,15 +2,14 @@ import asyncio
 import json
 from pathlib import Path
 
-from app.llm import NebiusClient
 from evals.run_eval import eval_item, summarize
-from tests.fake_llm import make_transport
+from tests.fake_llm import make_router
 
 
 async def test_eval_harness_smoke():
     items = json.loads(Path("evals/benchmark/specs.json").read_text())
     item = next(i for i in items if i["id"] == "bill_split")
-    client = NebiusClient(api_key="t", transport=make_transport())
+    client = make_router()
     res = await eval_item(item, client, 4, asyncio.Semaphore(1))
     await client.aclose()
     for cond in ("B0", "B1", "SF"):

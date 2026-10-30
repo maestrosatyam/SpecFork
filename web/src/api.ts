@@ -1,5 +1,6 @@
 // API client. Same-origin `/api/...` in live mode; in-browser fake server in mock mode.
-import type { Health, Preset, Run, RunSummary } from "./types";
+import { runTokenHeaders, saveRunToken } from "./lib/runTokens";
+import type { AnswersBody, CreateRunBody, Health, Preset, Run, RunSummary } from "./types";
 import { MOCK_HEALTH, MOCK_PRESETS, MockHttpError, mockServer } from "./mock/mockApi";
 
 export class ApiError extends Error {
@@ -18,11 +19,13 @@ export interface Api {
   health(): Promise<Health>;
   presets(): Promise<Preset[]>;
   listRuns(): Promise<RunSummary[]>;
-  createRun(body: { spec: string; n_samples?: number; preset_id?: string }): Promise<{ id: string }>;
+  /** Creates a run; the returned owner token is also remembered in localStorage (specfork.runTokens). */
+  createRun(body: CreateRunBody): Promise<{ id: string; token?: string }>;
   getRun(id: string): Promise<Run>;
   /** Streams snapshots until the run leaves an active status. Returns an unsubscribe fn. */
   subscribe(id: string, onRun: (run: Run) => void, onEnd: () => void, onError?: (e: unknown) => void): () => void;
-  postAnswers(id: string, answers: Record<string, string>): Promise<Run>;
+  /** Owner-only: sends X-Run-Token. A 403 means this browser didn't start the run. */
+  postAnswers(id: string, body: AnswersBody): Promise<Run>;
   converge(id: string, n_samples?: number): Promise<Run>;
   /** Download URLs (blob URLs in mock mode). */
   testsUrl(run: Run): string;
@@ -78,16 +81,22 @@ export const liveApi: Api = {
   presets: () => http<Preset[]>("/api/presets"),
   listRuns: () => http<RunSummary[]>(`/api/runs?ids=${encodeURIComponent(myRunIds().join(","))}`),
   createRun: async (body) => {
-    const r = await http<{ id: string }>("/api/runs", { method: "POST", body: JSON.stringify(body) });
+    const r = await http<{ id: string; token?: string }>("/api/runs", { method: "POST", body: JSON.stringify(body) });
     rememberRunId(r.id);
+    if (r.token) saveRunToken(r.id, r.token);
     return r;
   },
   getRun: (id) => http<Run>(`/api/runs/${encodeURIComponent(id)}`),
-  postAnswers: (id, answers) =>
-    http<Run>(`/api/runs/${encodeURIComponent(id)}/answers`, { method: "POST", body: JSON.stringify({ answers }) }),
+  postAnswers: (id, body) =>
+    http<Run>(`/api/runs/${encodeURIComponent(id)}/answers`, {
+      method: "POST",
+      headers: runTokenHeaders(id),
+      body: JSON.stringify(body),
+    }),
   converge: (id, n_samples) =>
     http<Run>(`/api/runs/${encodeURIComponent(id)}/converge`, {
       method: "POST",
+      headers: runTokenHeaders(id),
       body: JSON.stringify(n_samples ? { n_samples } : {}),
     }),
   testsUrl: (run) => `/api/runs/${encodeURIComponent(run.id)}/tests.py`,
@@ -225,11 +234,13 @@ export const mockApi: Api = {
     wrapMock(() => {
       const spec = body.spec.trim();
       if (!spec) throw new MockHttpError(422, "Spec is empty.");
-      return { id: mockServer().create(spec, body.n_samples ?? 24) };
+      const r = mockServer().create(spec, body);
+      saveRunToken(r.id, r.token);
+      return r;
     }),
   getRun: (id) => wrapMock(() => JSON.parse(JSON.stringify(mockServer().get(id))) as Run),
-  postAnswers: (id, answers) => wrapMock(() => mockServer().answers(id, answers)),
-  converge: (id, n) => wrapMock(() => mockServer().converge(id, n)),
+  postAnswers: (id, body) => wrapMock(() => mockServer().answers(id, body, runTokenHeaders(id)["X-Run-Token"])),
+  converge: (id, n) => wrapMock(() => mockServer().converge(id, n, runTokenHeaders(id)["X-Run-Token"])),
   subscribe: (id, onRun, onEnd) => mockServer().subscribe(id, onRun, onEnd),
   testsUrl: (run) => blobUrl(`${run.id}-tests`, run.resolution?.tests_code ?? "", "text/x-python"),
   exportUrl: (run) => blobUrl(`${run.id}-export`, exportMarkdown(run), "text/markdown"),

@@ -91,8 +91,8 @@ def main() -> int:
     if live:
         check("live fork (real Nebius inference)", live_run)
 
-    stamp = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-    md = [f"# Hosted smoke test\n", f"Target: {base}  \nRun at: {stamp}  \nClient: unauthenticated `httpx` from a fresh process (no cookies).\n",
+    stamp = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
+    md = ["# Hosted smoke test\n", f"Target: {base}  \nRun at: {stamp}  \nClient: unauthenticated `httpx` from a fresh process (no cookies).\n",
           "| Check | Result | Detail |", "|---|---|---|"]
     md += [f"| {n} | {'PASS' if ok else 'FAIL'} | {d.replace('|', '/')} |" for n, ok, d in rows]
     print("\n".join(md))

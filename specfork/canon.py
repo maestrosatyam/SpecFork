@@ -47,7 +47,7 @@ def canon(v, _depth=0):  # noqa: C901 - flat type dispatch is clearer here
     if isinstance(v, (_dt.datetime, _dt.date, _dt.time)):
         return v.isoformat()
     if isinstance(v, _dt.timedelta):
-        return "timedelta(%r)" % v.total_seconds()
+        return f"timedelta({v.total_seconds()!r})"
     if isinstance(v, (list, tuple)):
         return "[" + ", ".join(canon(x, _depth + 1) for x in v) + "]"
     if isinstance(v, (set, frozenset)):
