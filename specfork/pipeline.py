@@ -25,6 +25,7 @@ from .sandbox import check_code, exec_semaphore, run_function
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,40}$")
 MAX_INPUTS = 24
 CONSENSUS_SHARE = 0.75
+ADAPTIVE_BATCH, ADAPTIVE_MIN = 8, 16
 # Defaults favour recall (the benchmark shows unpopular intents are mostly caught by assumption questions);
 # a stricter setting (e.g. 0.6 / 2 / witness required) asks fewer questions on clear specs. See docs/EVALUATION.md.
 ASSUMPTION_MIN_CONFIDENCE = 0.0
@@ -55,7 +56,7 @@ DEFAULT_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
 def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None,
             fast_model: str = DEFAULT_FAST, deep_model: str = DEFAULT_DEEP, *,
             implementers: list[str] | None = None, assumptions: bool = True,
-            exception_types: bool = False) -> dict[str, Any]:
+            exception_types: bool = False, adaptive_n: bool = False) -> dict[str, Any]:
     """A fresh run record. Model arguments are model ids (or registry keys) resolved by the ModelRouter."""
     t = now()
     return {
@@ -63,7 +64,7 @@ def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None
         "spec": spec, "preset_id": preset_id, "is_sample": False,
         "settings": {"n_samples": n_samples, "fast_model": fast_model, "deep_model": deep_model,
                      "implementers": list(implementers or [fast_model]), "assumptions": assumptions,
-                     "exception_types": exception_types,
+                     "exception_types": exception_types, "adaptive_n": adaptive_n,
                      "prompt_version": prompts.PROMPT_VERSION, "prompt_hash": prompts.prompt_hash()},
         "inputs": [], "implementations": [], "clusters": [], "questions": [], "trace": [],
         "metrics": {"total_cost_usd": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "n_calls": 0, "wall_time_s": 0.0},
@@ -360,12 +361,36 @@ class SpecFork:
         run["stage"] = "fanout"
         n = run["settings"]["n_samples"]
         implementers = run["settings"].get("implementers") or [run["settings"]["fast_model"]]
-        run["implementations"] = [{"id": f"m{k}", "index": k, "model": implementers[k % len(implementers)], "status": "pending"}
-                                  for k in range(n)]
-        self._log(run, "fanout", f"Requesting {n} independent implementations from {run['settings']['fast_model']}")
         base = int(hashlib.sha256(run["spec"].encode()).hexdigest()[:6], 16)
-        await asyncio.gather(*(self._one_impl(run, impl, run["spec"], run["inputs"], base + impl["index"], "implement")
-                               for impl in run["implementations"]))
+
+        def make(k: int) -> dict[str, Any]:
+            return {"id": f"m{k}", "index": k, "model": implementers[k % len(implementers)], "status": "pending"}
+
+        if not run["settings"].get("adaptive_n"):
+            run["implementations"] = [make(k) for k in range(n)]
+            self._log(run, "fanout", f"Requesting {n} independent implementations from {run['settings']['fast_model']}")
+            await asyncio.gather(*(self._one_impl(run, impl, run["spec"], run["inputs"], base + impl["index"], "implement")
+                                   for impl in run["implementations"]))
+        else:
+            # Adaptive N: batches of 8; stop once a batch reveals no new behaviour and the majority share is stable.
+            run["implementations"] = []
+            self._log(run, "fanout", f"Requesting implementations in batches of {ADAPTIVE_BATCH} (at most {n})")
+            prev_sigs: set[tuple[str, ...]] = set()
+            prev_major = -1.0
+            while len(run["implementations"]) < n:
+                batch = [make(k) for k in range(len(run["implementations"]), min(n, len(run["implementations"]) + ADAPTIVE_BATCH))]
+                run["implementations"].extend(batch)
+                await asyncio.gather(*(self._one_impl(run, impl, run["spec"], run["inputs"], base + impl["index"], "implement")
+                                       for impl in batch))
+                ids = [i["id"] for i in run["inputs"]]
+                ex = {i["id"]: i["outcomes"] for i in run["implementations"] if i["status"] == "executed"}
+                sigs = {tuple(outcome_key(o.get(x)) for x in ids) for o in ex.values()}
+                major = cluster_impls(ex, ids).clusters[0]["share"] if ex else 0.0
+                done = len(run["implementations"]) >= ADAPTIVE_MIN and sigs <= prev_sigs and abs(major - prev_major) < 0.1
+                prev_sigs, prev_major = sigs, major
+                if done:
+                    self._log(run, "fanout", f"Behaviours stable after {len(run['implementations'])} implementations; stopping early")
+                    break
         run["stage"] = "execute"
         st = [i["status"] for i in run["implementations"]]
         self._log(run, "execute", f"Executed {st.count('executed')} implementations in the sandbox "

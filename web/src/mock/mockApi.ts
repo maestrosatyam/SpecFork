@@ -17,6 +17,8 @@ import {
   recomputeMetrics,
   rng,
   sampleRun,
+  mixedSampleRun,
+  MIXED_SAMPLE_RUN_ID,
 } from "./billFixture";
 
 export const MOCK_PRESETS: Preset[] = [
@@ -71,6 +73,7 @@ class MockServer {
 
   constructor() {
     this.runs.set(SAMPLE_RUN_ID, sampleRun());
+    this.runs.set(MIXED_SAMPLE_RUN_ID, mixedSampleRun());
   }
 
   emit(id: string) {
@@ -112,10 +115,16 @@ class MockServer {
     const fastId = MOCK_REGISTRY[body.fast_model ?? ""]?.id ?? FAST_MODEL;
     const deepId = MOCK_REGISTRY[body.deep_model ?? ""]?.id ?? DEEP_MODEL;
     const assumptions = body.assumptions !== false;
-    const final = buildBillRun({ id, n, spec: spec.trim() || BILL_SPEC, createdAt: now() });
+    const final = buildBillRun({ id, n, spec: spec.trim() || BILL_SPEC, createdAt: now(), exceptionTypes: !!body.exception_types });
     // Re-label the fixture with the chosen models.
     const remap = (m: string) => (m === FAST_MODEL ? fastId : m === DEEP_MODEL ? deepId : m);
-    final.settings = { ...final.settings, fast_model: fastId, deep_model: deepId, assumptions };
+    final.settings = {
+      ...final.settings,
+      fast_model: fastId,
+      deep_model: deepId,
+      assumptions,
+      implementers: (final.settings.implementers ?? [FAST_MODEL]).map(remap),
+    };
     final.trace = final.trace.map((c) => ({ ...c, model: remap(c.model) }));
     final.implementations = final.implementations.map((i) => ({ ...i, model: remap(i.model) }));
     final.log = final.log.map((l) => ({

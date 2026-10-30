@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCall, formatCost, formatDuration, formatPct, formatTokens, isErrorRepr, pyRepr, shortModel } from "./format";
+import { describeRepr, formatCall, formatCost, formatDuration, formatPct, formatTokens, isErrorRepr, pyRepr, shortModel } from "./format";
 
 describe("formatCost", () => {
   it("uses 4 decimals for typical run totals", () => {
@@ -68,5 +68,19 @@ describe("python rendering", () => {
   });
   it("shortens model ids", () => {
     expect(shortModel("nvidia/Nemotron-3-Ultra-550b-a55b")).toBe("Nemotron-3-Ultra-550b-a55b");
+  });
+});
+
+describe("describeRepr", () => {
+  it("renders generic and typed raises", () => {
+    expect(describeRepr("raises")).toEqual({ raises: true, text: "raises" });
+    expect(describeRepr("raises:ValueError")).toEqual({ raises: true, type: "ValueError", text: "raises ValueError" });
+    expect(describeRepr("raises:json.JSONDecodeError").text).toBe("raises json.JSONDecodeError");
+  });
+  it("keeps legacy bare exception names and plain values", () => {
+    expect(describeRepr("TypeError").text).toBe("raises TypeError");
+    expect(describeRepr("[33.33, 33.33]")).toEqual({ raises: false, text: "[33.33, 33.33]" });
+    expect(describeRepr("'raises'").raises).toBe(false);
+    expect(isErrorRepr("raises:KeyError")).toBe(true);
   });
 });

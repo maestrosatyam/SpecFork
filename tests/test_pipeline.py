@@ -251,3 +251,13 @@ async def test_exception_types_option_locks_exception_class(tmp_path):
     r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(tmp_path)], capture_output=True, text=True, cwd=tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
     await client.aclose()
+
+
+async def test_adaptive_n_stops_early_when_behaviours_stabilise():
+    eng, client = _engine()
+    run = new_run("t10", SPEC, 40, adaptive_n=True)
+    await eng.run_all(run)
+    assert run["status"] == "awaiting_answers"
+    assert 16 <= len(run["implementations"]) < 40  # the scripted fake has only 3 behaviours
+    assert any("stopping early" in entry["msg"] for entry in run["log"])
+    await client.aclose()

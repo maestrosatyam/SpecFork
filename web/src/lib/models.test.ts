@@ -10,6 +10,12 @@ import {
   labelsFromHealth,
   modelLabel,
   modelsForRole,
+  implementerLabel,
+  compactLabels,
+  executedModels,
+  modelMix,
+  clusterModelBreakdown,
+  formatBreakdown,
 } from "./models";
 
 const health: Health = {
@@ -72,5 +78,64 @@ describe("how it works copy", () => {
     expect(ask.body).toContain("silent assumptions");
     expect(lock.body).toMatch(/^DEEP writes your answers into a clarified spec/);
     expect(lock.body).toContain("on FAST");
+  });
+});
+
+describe("mixed-model fan-out breakdown", () => {
+  const available = [
+    { key: "lightning", label: "NVIDIA Nemotron 3.5 Lightning", roles: ["fast" as const], model: "nvidia/Nemotron-3_5-Lightning" },
+    { key: "super", label: "NVIDIA Nemotron 3 Super", roles: ["fast" as const], model: "nvidia/Nemotron-3-Super-120b-a12b" },
+  ];
+  const impl = (id: string, model: string, status: "executed" | "rejected" = "executed") => ({ id, index: 0, model, status });
+  const L = "nvidia/Nemotron-3_5-Lightning";
+  const S = "nvidia/Nemotron-3-Super-120b-a12b";
+  const Q = "Qwen/Qwen3-Coder-480B-A35B-Instruct";
+  const cluster = (id: string, impl_ids: string[]) => ({
+    id,
+    label: id,
+    impl_ids,
+    size: impl_ids.length,
+    share: 0,
+    representative_impl_id: impl_ids[0],
+    kind: "behavior" as const,
+  });
+
+  it("labels implementers from available_models, else the id's last segment", () => {
+    expect(implementerLabel(L, { available })).toBe("NVIDIA Nemotron 3.5 Lightning");
+    expect(implementerLabel(Q, { available })).toBe("Qwen3-Coder-480B-A35B-Instruct");
+    expect(implementerLabel("plain-model", { available: [] })).toBe("plain-model");
+  });
+
+  it("compacts labels by their shared leading words", () => {
+    expect(compactLabels(["NVIDIA Nemotron 3.5 Lightning", "NVIDIA Nemotron 3 Super"])).toEqual({
+      "NVIDIA Nemotron 3.5 Lightning": "3.5 Lightning",
+      "NVIDIA Nemotron 3 Super": "3 Super",
+    });
+    expect(compactLabels(["NVIDIA Nemotron 3.5 Lightning", "Qwen3-Coder"])).toEqual({
+      "NVIDIA Nemotron 3.5 Lightning": "Nemotron 3.5 Lightning",
+      "Qwen3-Coder": "Qwen3-Coder",
+    });
+  });
+
+  it("returns null for single-model runs and ignores non-executed impls", () => {
+    const run = { implementations: [impl("a", L), impl("b", L), impl("c", S, "rejected")], clusters: [cluster("cA", ["a", "b"])] };
+    expect(executedModels(run)).toEqual([L]);
+    expect(modelMix(run, { available })).toBeNull();
+  });
+
+  it("breaks each cluster down per model, largest first", () => {
+    const run = {
+      implementations: [impl("a", L), impl("b", Q), impl("c", Q), impl("d", L), impl("e", L)],
+      clusters: [cluster("cA", ["a", "b", "c"]), cluster("cB", ["d", "e"])],
+    };
+    const bd = clusterModelBreakdown(run, { available });
+    expect(bd.cA.map((x) => [x.label, x.count])).toEqual([
+      ["Qwen3-Coder-480B-A35B-Instruct", 2],
+      ["Nemotron 3.5 Lightning", 1],
+    ]);
+    expect(formatBreakdown(bd.cB)).toBe("Nemotron 3.5 Lightning 2");
+    const mix = modelMix(run, { available })!;
+    expect(mix.families).toBe(2);
+    expect(mix.byCluster.cA).toBe("Qwen3-Coder-480B-A35B-Instruct 2 · Nemotron 3.5 Lightning 1");
   });
 });

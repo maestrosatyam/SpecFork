@@ -26,6 +26,9 @@ inputs:
   comment:
     description: Post the report as a pull-request comment ("true"/"false"; needs pull-requests write permission).
     default: "true"
+  open-pr:
+    description: When tests were locked, open a pull request with them and the saved runs ("true"/"false"; needs contents and pull-requests write permission).
+    default: "false"
   nebius-api-key:
     description: API key for the default NVIDIA Nemotron profiles on Nebius Token Factory (or set the key your specfork.toml profiles use as an env var).
     required: false
@@ -65,6 +68,20 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: gh pr comment "${{ github.event.pull_request.number }}" --body-file "${{ steps.run.outputs.report }}" --repo "${{ github.repository }}"
+    - name: Open a pull request with the locked tests
+      if: ${{ inputs.open-pr == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        git add "${{ inputs.tests-dir }}" "${{ inputs.state-dir }}" 2>/dev/null || true
+        if git diff --cached --quiet; then echo "no new locked tests"; exit 0; fi
+        branch="specfork/locked-tests-${{ github.run_id }}"
+        git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+          commit -m "Lock SpecFork tests for answered specs"
+        git push origin "HEAD:$branch"
+        gh pr create --head "$branch" --title "SpecFork: locked tests for answered specs" \
+          --body-file "${{ steps.run.outputs.report }}" --repo "${{ github.repository }}"
     - name: Propagate result
       shell: bash
       run: exit "${{ steps.run.outputs.code }}"
