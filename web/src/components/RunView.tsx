@@ -12,7 +12,7 @@ import {
   clusterStyles,
 } from "../lib/clusters";
 import { formatDate } from "../lib/format";
-import { runModelLabels, useLabels } from "../lib/models";
+import { implementerLabel, modelMix, runModelLabels, useLabels } from "../lib/models";
 import { NOT_OWNER_MSG } from "../lib/runTokens";
 import { useRun } from "../lib/useRun";
 import type { Implementation, Run, RunStatus } from "../types";
@@ -322,6 +322,12 @@ function RunBody({
     () => (customId ? { ...fullRun, implementations: fullRun.implementations.filter((i) => i.id !== customId) } : fullRun),
     [fullRun, customId],
   );
+  const mix = useMemo(() => (modelMix(run, labels)), [run, labels]);
+  const modelNames = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const i of run.implementations) if (i.model && !out[i.model]) out[i.model] = implementerLabel(i.model, labels);
+    return out;
+  }, [run, labels]);
   const customImpl = customId ? fullRun.implementations.find((i) => i.id === customId) : undefined;
   const rl = runModelLabels(run, labels);
 
@@ -397,7 +403,7 @@ function RunBody({
                 </p>
               </div>
               {run.clusters.length > 0 ? (
-                <ClusterLegend clusters={run.clusters} styles={styles} onHover={setHover} focus={focus} />
+                <ClusterLegend clusters={run.clusters} styles={styles} onHover={setHover} focus={focus} breakdown={mix?.byCluster} />
               ) : (
                 <GridStatusLegend />
               )}
@@ -408,6 +414,7 @@ function RunBody({
               focus={focus}
               onOpen={setOpenImpl}
               expected={run.settings.n_samples}
+              modelNames={modelNames}
             />
           </section>
 
@@ -441,7 +448,7 @@ function RunBody({
                 <section className="card p-5 sm:p-7" aria-label="Meanings">
                   <MeaningsHeader run={run} />
                   <div className="mt-6">
-                    <ClusterBar clusters={run.clusters} styles={styles} focus={focus} onHover={setHover} />
+                    <ClusterBar clusters={run.clusters} styles={styles} focus={focus} onHover={setHover} mix={mix} />
                   </div>
                 </section>
                 {ambOnly.map((q, i) => (

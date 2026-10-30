@@ -28,3 +28,17 @@ seed = true
 json_schema = false
 price_per_m = [1.00, 3.00]
 roles = ["deep"]
+
+# Optional second model family for a mixed-model fan-out (SPECFORK_IMPLEMENTERS=lightning,qwen3-30b).
+# Role "implementer" only: never offered as a default or in the web UI's model picker.
+[models.qwen3-30b]
+label = "Qwen3 30B A3B Instruct"
+provider_label = "Nebius Token Factory"
+api = "openai_compat"
+base_url = "https://api.tokenfactory.nebius.com/v1"
+model = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+key_env = "NEBIUS_API_KEY"
+reasoning = "none"
+json_schema = true
+price_per_m = [0.10, 0.30]
+roles = ["implementer"]

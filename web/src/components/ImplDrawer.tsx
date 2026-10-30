@@ -1,6 +1,6 @@
 // Lazy-loaded (see RunView).
 import type { ClusterStyle } from "../lib/clusters";
-import { formatCall, shortModel } from "../lib/format";
+import { describeRepr, formatCall, shortModel } from "../lib/format";
 import { modelLabel, useLabels } from "../lib/models";
 import { ClusterSwatch } from "./ClusterSwatch";
 import type { Implementation, Run } from "../types";
@@ -112,7 +112,7 @@ export default function ImplDrawer({
                               <span className="text-fog-50">{o.value_repr}</span>
                             ) : (
                               <span className="text-danger">
-                                {o.error_type ?? o.value_repr}
+                                raises {describeRepr(o.value_repr).type ?? o.error_type ?? "an exception"}
                                 {o.error_msg && <span className="block text-[12.5px] text-fog-400">{o.error_msg}</span>}
                               </span>
                             )}
@@ -126,7 +126,7 @@ export default function ImplDrawer({
                               ) : (
                                 <span className="inline-flex flex-col items-center">
                                   <IconX className="text-danger" aria-label="differs" />
-                                  <span className="mono text-[11.5px] text-fog-500">want {exp}</span>
+                                  <span className="mono text-[11.5px] text-fog-500">want {describeRepr(exp ?? "").text}</span>
                                 </span>
                               )}
                             </td>

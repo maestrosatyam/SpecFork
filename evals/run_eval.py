@@ -32,6 +32,7 @@ sys.path.insert(0, str(ROOT))
 MODEL_FAST = "nvidia/Nemotron-3_5-Lightning"  # replaced from Settings in main()
 MODEL_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
 ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS = 0.0, 3, False  # replaced from Settings in main()
+IMPLEMENTERS: list[str] = []  # model ids for the SpecFork fan-out (mixed-model condition); default: fast model
 
 
 
@@ -44,8 +45,9 @@ from specfork.registry import Registry  # noqa: E402
 from specfork.sandbox import check_code, exec_semaphore, run_function  # noqa: E402
 
 SIM_USER_SYSTEM = """You are the product owner who wrote a function spec. Your full, private intent is below.
-Answer the clarifying question by choosing the option that matches your intent. If NO option matches your
-intent, describe the behaviour you want in one precise sentence instead. Reply with JSON only:
+Answer the clarifying question. Choose an option ONLY if its label and its example outputs match your intent
+exactly. If no option matches exactly (for example the rounding, ordering or error behaviour differs), describe
+the behaviour you want in one precise sentence instead. Reply with JSON only:
 {"option": "<option id>"} or {"other": "<one sentence>"}"""
 
 SIM_USER_FREE_SYSTEM = """You are the product owner who wrote a function spec. Your full, private intent is below.
@@ -131,7 +133,8 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
             out["conditions"]["B1"] = {"error": f"{type(e).__name__}: {str(e)[:200]}", "cost_usd": r1["metrics"]["total_cost_usd"]}
 
         # ---------------- SpecFork
-        rs = new_run(f"sf-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP)
+        rs = new_run(f"sf-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP,
+                     implementers=IMPLEMENTERS or [MODEL_FAST])
         rs["signature"] = sig
         try:
             await eng.run_all(rs)
@@ -257,11 +260,12 @@ async def main() -> int:
     if args.items:
         wanted = set(args.items.split(","))
         items = [i for i in items if i["id"] in wanted]
-    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS
+    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS, IMPLEMENTERS
     settings = Settings.load(ROOT / ".env")
     ASSUME_CONF, ASSUME_MAX = settings.assumption_min_confidence, settings.max_assumptions
     ASSUME_WITNESS = settings.assumption_requires_witness
     registry = Registry.load(settings.models_file)
+    IMPLEMENTERS = [registry.get(k).model for k in settings.implementer_keys]
     MODEL_FAST, MODEL_DEEP = registry.get(settings.fast_model).model, registry.get(settings.deep_model).model
     client = ModelRouter(registry, settings.api_keys, max_concurrency=12, default_model=settings.fast_model)
     sem = asyncio.Semaphore(args.concurrency)
@@ -271,7 +275,7 @@ async def main() -> int:
     stamp = time.strftime("%Y%m%d-%H%M%S")
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
-    meta = {"timestamp": stamp, "n": args.n, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
+    meta = {"timestamp": stamp, "n": args.n, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "implementers": IMPLEMENTERS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
             "prompt_version": prompts.PROMPT_VERSION, "wall_s": round(time.time() - t0, 1), "items": len(items)}
     (outdir / f"eval-{stamp}.json").write_text(json.dumps({"meta": meta, "results": results}, indent=1))
     summary = summarize(results, args.n)

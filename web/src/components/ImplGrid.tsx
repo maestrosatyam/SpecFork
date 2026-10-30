@@ -12,8 +12,8 @@ export function isDimmed(impl: Implementation, focus: Focus): boolean {
   return !impl.cluster_id || !focus.active.has(impl.cluster_id);
 }
 
-function tileLabel(impl: Implementation, style?: ClusterStyle): string {
-  const n = `Implementation #${impl.index + 1}`;
+function tileLabel(impl: Implementation, style?: ClusterStyle, modelName?: string): string {
+  const n = `Implementation #${impl.index + 1}${modelName ? ` (${modelName})` : ""}`;
   if (impl.status === "rejected") return `${n}: rejected, ${impl.reject_reason ?? "failed static check"}`;
   if (impl.status === "pending") return `${n}: being written`;
   if (impl.status === "generated") return `${n}: written, waiting to run`;
@@ -27,11 +27,13 @@ export function ImplTile({
   style,
   dimmed,
   onOpen,
+  modelName,
 }: {
   impl: Implementation;
   style?: ClusterStyle;
   dimmed: boolean;
   onOpen: (impl: Implementation) => void;
+  modelName?: string;
 }) {
   const clustered = !!style && impl.status === "executed";
   const base =
@@ -74,8 +76,8 @@ export function ImplTile({
       layout="position"
       onClick={() => onOpen(impl)}
       disabled={impl.status === "pending"}
-      aria-label={tileLabel(impl, style)}
-      title={tileLabel(impl, style)}
+      aria-label={tileLabel(impl, style, modelName)}
+      title={tileLabel(impl, style, modelName)}
       className={`${base} ${cls} ${dimmed ? "opacity-[0.22] saturate-[0.35]" : "opacity-100"} disabled:cursor-default`}
       style={bg}
       initial={false}
@@ -100,12 +102,15 @@ export function ImplGrid({
   focus,
   onOpen,
   expected,
+  modelNames,
 }: {
   impls: Implementation[];
   styles: Record<string, ClusterStyle>;
   focus: Focus;
   onOpen: (impl: Implementation) => void;
   expected: number;
+  /** model id -> display label, for tile tooltips */
+  modelNames?: Record<string, string>;
 }) {
   // Before fan-out starts we know n_samples but have no impls: render placeholders.
   const placeholders = impls.length === 0 ? Array.from({ length: expected }, (_, i) => i) : [];
@@ -122,6 +127,7 @@ export function ImplGrid({
             style={impl.cluster_id ? styles[impl.cluster_id] : undefined}
             dimmed={isDimmed(impl, focus)}
             onOpen={onOpen}
+            modelName={impl.model ? modelNames?.[impl.model] : undefined}
           />
         </div>
       ))}
@@ -162,11 +168,14 @@ export function ClusterLegend({
   styles,
   onHover,
   focus,
+  breakdown,
 }: {
   clusters: Cluster[];
   styles: Record<string, ClusterStyle>;
   onHover: (id: string | null) => void;
   focus: Focus;
+  /** Mixed-model runs: cluster id -> "Lightning 6 · Qwen 3" */
+  breakdown?: Record<string, string>;
 }) {
   return (
     <ul className="flex flex-wrap gap-2" aria-label="Behaviour clusters">
@@ -193,6 +202,9 @@ export function ClusterLegend({
               <span className="tabular-nums">
                 {c.size} · {formatPct(c.share)}
               </span>
+              {breakdown?.[c.id] && (
+                <span className="border-l border-white/10 pl-1.5 text-[12px] tabular-nums text-fog-400">{breakdown[c.id]}</span>
+              )}
             </button>
           </li>
         );

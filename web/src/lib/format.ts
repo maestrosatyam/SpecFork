@@ -129,7 +129,22 @@ export function modelFamily(model: string): string {
   return shortModel(model);
 }
 
-/** "ValueError", "Timeout", "ZeroDivisionError" -> true. Used to style raised exceptions differently from values. */
+const LEGACY_EXC = /^[A-Z]\w*(Error|Exception|Exit|Interrupt|Warning)$|^Timeout$/;
+
+/**
+ * How to show an outcome repr. Backends emit "raises" (any exception) or, with exception types on,
+ * "raises:ValueError". Older runs/fixtures use the bare type ("ValueError").
+ */
+export function describeRepr(repr: string): { raises: boolean; type?: string; text: string } {
+  const r = (repr ?? "").trim();
+  if (r === "raises") return { raises: true, text: "raises" };
+  const m = r.match(/^raises:\s*([\w.]+)$/);
+  if (m) return { raises: true, type: m[1], text: `raises ${m[1]}` };
+  if (LEGACY_EXC.test(r)) return { raises: true, type: r, text: `raises ${r}` };
+  return { raises: false, text: repr };
+}
+
+/** "raises", "raises:ValueError", "ValueError", "Timeout" -> true. Used to style raised exceptions differently from values. */
 export function isErrorRepr(repr: string): boolean {
-  return /^[A-Z]\w*(Error|Exception|Exit|Interrupt)$|^Timeout$/.test(repr.trim());
+  return describeRepr(repr).raises;
 }

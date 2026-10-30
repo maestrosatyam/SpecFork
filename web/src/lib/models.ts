@@ -72,3 +72,86 @@ export function modelsForRole(available: AvailableModel[], role: ModelRole): Ava
 
 export const LabelsContext = createContext<Labels>(DEFAULT_LABELS);
 export const useLabels = () => useContext(LabelsContext);
+
+// ---------------------------------------------------------------- mixed-model fan-out
+
+/** Label for an implementer model id: health `available_models` (matched on `model`), else the id's last path segment. */
+export function implementerLabel(model: string, labels: Pick<Labels, "available">): string {
+  const reg = labels.available.find((m) => !!m.model && m.model === model);
+  if (reg?.label) return reg.label;
+  const i = model.lastIndexOf("/");
+  return i >= 0 ? model.slice(i + 1) : model;
+}
+
+/**
+ * Shorten a set of labels for compact display: drop leading words they all share
+ * ("NVIDIA Nemotron 3.5 Lightning" + "NVIDIA Nemotron Super" -> "3.5 Lightning", "Super"); otherwise drop a
+ * leading "NVIDIA". Returns a map from original label to short label.
+ */
+export function compactLabels(all: string[]): Record<string, string> {
+  const uniq = [...new Set(all)];
+  const out: Record<string, string> = {};
+  if (uniq.length === 0) return out;
+  const words = uniq.map((l) => l.split(/\s+/));
+  let k = 0;
+  while (uniq.length > 1 && words.every((w) => w.length > k + 1 && w[k] === words[0][k])) k++;
+  for (let i = 0; i < uniq.length; i++) {
+    let short = words[i].slice(k).join(" ");
+    if (k === 0) short = short.replace(/^NVIDIA\s+/, "");
+    out[uniq[i]] = short || uniq[i];
+  }
+  return out;
+}
+
+export type ModelCount = { model: string; label: string; count: number };
+
+/** Distinct models among executed implementations (in first-seen order). */
+export function executedModels(run: Pick<Run, "implementations">): string[] {
+  const seen: string[] = [];
+  for (const i of run.implementations) if (i.status === "executed" && i.model && !seen.includes(i.model)) seen.push(i.model);
+  return seen;
+}
+
+/** Per-cluster model breakdown, largest first. Labels are compacted across the whole run. */
+export function clusterModelBreakdown(
+  run: Pick<Run, "implementations" | "clusters">,
+  labels: Pick<Labels, "available">,
+): Record<string, ModelCount[]> {
+  const models = executedModels(run);
+  const full = Object.fromEntries(models.map((m) => [m, implementerLabel(m, labels)]));
+  const short = compactLabels(Object.values(full));
+  const byId = new Map(run.implementations.map((i) => [i.id, i]));
+  const out: Record<string, ModelCount[]> = {};
+  for (const c of run.clusters) {
+    const counts = new Map<string, number>();
+    for (const id of c.impl_ids) {
+      const m = byId.get(id)?.model;
+      if (m) counts.set(m, (counts.get(m) ?? 0) + 1);
+    }
+    out[c.id] = [...counts.entries()]
+      .map(([model, count]) => ({ model, label: short[full[model] ?? model] ?? implementerLabel(model, labels), count }))
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  }
+  return out;
+}
+
+/** "Lightning 6 · Qwen 3" */
+export function formatBreakdown(items: ModelCount[]): string {
+  return items.map((i) => `${i.label} ${i.count}`).join(" · ");
+}
+
+/** Mixed-model summary for a run: null when every executed implementation came from one model. */
+export function modelMix(
+  run: Pick<Run, "implementations" | "clusters">,
+  labels: Pick<Labels, "available">,
+): { families: number; byCluster: Record<string, string>; byModel: Record<string, string> } | null {
+  const models = executedModels(run);
+  if (models.length < 2) return null;
+  const breakdown = clusterModelBreakdown(run, labels);
+  const short = compactLabels(models.map((m) => implementerLabel(m, labels)));
+  return {
+    families: models.length,
+    byCluster: Object.fromEntries(Object.entries(breakdown).map(([cid, items]) => [cid, formatBreakdown(items)])),
+    byModel: Object.fromEntries(models.map((m) => [m, short[implementerLabel(m, labels)]])),
+  };
+}

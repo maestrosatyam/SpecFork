@@ -12,9 +12,9 @@ import {
   OTHER_MIN,
   otherValid,
 } from "../lib/clusters";
-import { formatCall, formatPct, isErrorRepr } from "../lib/format";
+import { describeRepr, formatCall, formatPct } from "../lib/format";
 import type { Cluster, Question, QuestionOption, Run } from "../types";
-import { IconAlert, IconBug, IconCheck, IconLock } from "./Icons";
+import { IconAlert, IconBug, IconCheck, IconInfo, IconLock } from "./Icons";
 import type { Focus } from "./ImplGrid";
 import { ClusterSwatch } from "./ClusterSwatch";
 
@@ -23,16 +23,28 @@ export function ClusterBar({
   styles,
   focus,
   onHover,
+  mix,
 }: {
   clusters: Cluster[];
   styles: Record<string, ClusterStyle>;
   focus: Focus;
   onHover: (id: string | null) => void;
+  /** Mixed-model runs: number of model families + per-cluster "Lightning 6 · Qwen 3" breakdown. */
+  mix?: { families: number; byCluster: Record<string, string> } | null;
 }) {
   const total = clusters.reduce((a, c) => a + c.share, 0) || 1;
   const isDim = (id: string) => (focus.hover ? focus.hover !== id : focus.active ? !focus.active.has(id) : false);
   return (
     <div>
+      {mix && (
+        <p className="mb-3 flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-[14px] leading-snug text-fog-300">
+          <IconInfo size={16} className="mt-0.5 shrink-0 text-accent" />
+          <span>
+            Implementations from {mix.families} model families. Splits that follow model lines may reflect model
+            differences rather than spec ambiguity.
+          </span>
+        </p>
+      )}
       <div
         className="flex h-[52px] w-full gap-[3px] overflow-hidden rounded-xl"
         role="img"
@@ -83,6 +95,7 @@ export function ClusterBar({
             <div className="min-w-0">
               <div className="text-[13px] tabular-nums text-fog-400">
                 {c.size} implementation{c.size === 1 ? "" : "s"} · {formatPct(c.share)}
+                {mix?.byCluster[c.id] && <span className="ml-1.5 text-fog-500">· {mix.byCluster[c.id]}</span>}
                 {c.kind === "crash" && <span className="ml-1.5 text-danger">· crashes</span>}
               </div>
               <p className="mt-0.5 text-[14.5px] leading-snug text-fog-200">{c.summary ?? "No summary yet."}</p>
@@ -96,7 +109,7 @@ export function ClusterBar({
 
 function Witness({ run, inputId, value }: { run: Run; inputId: string; value: string }) {
   const inp = run.inputs.find((i) => i.id === inputId);
-  const err = isErrorRepr(value);
+  const view = describeRepr(value);
   return (
     <div className="mono flex flex-wrap items-baseline gap-x-2 text-[13.5px] leading-relaxed">
       <span className="text-fog-300">{inp ? formatCall(run.signature?.name, inp.args, run.signature?.params) : inputId}</span>
@@ -104,7 +117,7 @@ function Witness({ run, inputId, value }: { run: Run; inputId: string; value: st
         →
       </span>
       <span className="sr-only">returns</span>
-      <span className={err ? "text-danger" : "font-medium text-fog-50"}>{err ? `raises ${value}` : value}</span>
+      <span className={view.raises ? "text-danger" : "font-medium text-fog-50"}>{view.text}</span>
     </div>
   );
 }
