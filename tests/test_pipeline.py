@@ -144,6 +144,9 @@ async def test_silent_assumption_override_unlocks_cases():
     behaviours = [c for c in run["clusters"] if c["kind"] == "behavior"]
     answers = {q["id"]: next(o["id"] for o in q["options"] if behaviours[0]["id"] in o["cluster_ids"])
                for q in run["questions"] if q["kind"] == "ambiguity"}
+    for q in run["questions"]:
+        if q["kind"] == "assumption":
+            answers[q["id"]] = q["options"][0]["id"]
     answers[a["id"]] = alt["id"]
     await eng.resolve(run, answers)
     res = run["resolution"]
@@ -179,7 +182,8 @@ async def test_free_text_other_answer_is_implemented_and_executed():
 
 
 async def test_assumption_confidence_threshold_and_toggle():
-    eng, client = _engine()
+    client = make_router()
+    eng = SpecFork(client, lambda run: None, assumption_min_confidence=0.6, max_assumptions=2, assumption_requires_witness=True)
     run = new_run("t5", SPEC, 8)
     await eng.run_all(run)
     assert [q["text"] for q in run["questions"] if q["kind"] == "assumption"] == ["Should a $0 bill be split at all?"]

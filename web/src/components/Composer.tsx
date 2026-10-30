@@ -154,9 +154,10 @@ export function Composer({
   const [fastKey, setFastKey] = useState(() => defaultModelKey(fastModels, labels.fast));
   const [deepKey, setDeepKey] = useState(() => defaultModelKey(deepModels, labels.deep));
   const [assumptions, setAssumptions] = useState(true);
+  const [exceptionTypes, setExceptionTypes] = useState(false);
   const fastDefault = defaultModelKey(fastModels, labels.fast);
   const deepDefault = defaultModelKey(deepModels, labels.deep);
-  const advancedChanged = !assumptions || (fastKey && fastKey !== fastDefault) || (deepKey && deepKey !== deepDefault);
+  const advancedChanged = !assumptions || exceptionTypes || (fastKey && fastKey !== fastDefault) || (deepKey && deepKey !== deepDefault);
   const [spec, setSpec] = useState(initialSpec);
   const [presetId, setPresetId] = useState<string | undefined>();
   const [n, setN] = useState<number>(DEFAULT_SAMPLES);
@@ -181,6 +182,7 @@ export function Composer({
     try {
       const matching = presets?.find((p) => p.id === presetId && p.spec.trim() === spec.trim());
       const body: CreateRunBody = { spec: spec.trim(), n_samples: n, preset_id: matching?.id, assumptions };
+      if (exceptionTypes) body.exception_types = true;
       // Only send model keys the server advertised, and only when the user picked a non-default one.
       if (fastKey && fastKey !== fastDefault && fastModels.some((m) => m.key === fastKey)) body.fast_model = fastKey;
       if (deepKey && deepKey !== deepDefault && deepModels.some((m) => m.key === deepKey)) body.deep_model = deepKey;
@@ -374,6 +376,20 @@ export function Composer({
                   <span className="text-fog-100">Look for silent assumptions</span>
                   <span className="block text-[12.5px] text-fog-500">
                     Also ask about choices every implementation made that your spec never stated.
+                  </span>
+                </span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={exceptionTypes}
+                  onChange={(e) => setExceptionTypes(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-[#a5b4fc]"
+                />
+                <span>
+                  <span className="text-fog-100">Distinguish exception types</span>
+                  <span className="block text-[12.5px] text-fog-500">
+                    Treat ValueError vs TypeError as different behaviours and lock the type in tests.
                   </span>
                 </span>
               </label>

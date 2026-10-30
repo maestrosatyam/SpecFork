@@ -11,7 +11,7 @@ Nothing in the ``specfork`` package reads ``os.environ`` at import time. Build a
 | ``SPECFORK_MODELS_FILE`` | ``./specfork.toml`` if present | extra model profiles |
 | ``SPECFORK_PUBLIC_DEMO`` | ``0`` | public-demo hardening (no OpenAPI, priced models only, memory-only store) |
 | ``SPECFORK_ASSUMPTIONS`` | ``1`` | look for silent assumptions by default |
-| ``SPECFORK_ASSUMPTION_MIN_CONFIDENCE`` / ``SPECFORK_MAX_ASSUMPTIONS`` | 0.6 / 2 | strictness of the assumption review |
+| ``SPECFORK_ASSUMPTION_MIN_CONFIDENCE`` / ``SPECFORK_MAX_ASSUMPTIONS`` / ``SPECFORK_ASSUMPTION_REQUIRES_WITNESS`` | 0.0 / 3 / 0 | strictness of the assumption review (strict: 0.6 / 2 / 1) |
 | ``SPECFORK_EXCEPTION_TYPES`` | ``0`` | treat different exception types as different behaviours and lock them in tests |
 | ``SPECFORK_DB`` | ``specfork.db`` (``""`` = memory only) | SQLite file for runs (ignored in public-demo mode) |
 | ``RATE_LIMIT_RUNS`` / ``RATE_LIMIT_WINDOW_S`` / ``DAILY_BUDGET_USD`` | 6 / 600 / 5 | abuse and cost controls |
@@ -46,8 +46,9 @@ class Settings(BaseSettings):
     public_demo: bool = Field(default=False, validation_alias="SPECFORK_PUBLIC_DEMO")
     assumptions: bool = Field(default=True, validation_alias="SPECFORK_ASSUMPTIONS")
     exception_types: bool = Field(default=False, validation_alias="SPECFORK_EXCEPTION_TYPES")
-    assumption_min_confidence: float = Field(default=0.6, ge=0, le=1, validation_alias="SPECFORK_ASSUMPTION_MIN_CONFIDENCE")
-    max_assumptions: int = Field(default=2, ge=0, le=5, validation_alias="SPECFORK_MAX_ASSUMPTIONS")
+    assumption_min_confidence: float = Field(default=0.0, ge=0, le=1, validation_alias="SPECFORK_ASSUMPTION_MIN_CONFIDENCE")
+    max_assumptions: int = Field(default=3, ge=0, le=5, validation_alias="SPECFORK_MAX_ASSUMPTIONS")
+    assumption_requires_witness: bool = Field(default=False, validation_alias="SPECFORK_ASSUMPTION_REQUIRES_WITNESS")
     db_path: str = Field(default="specfork.db", validation_alias="SPECFORK_DB")
     rate_limit_runs: int = Field(default=6, validation_alias="RATE_LIMIT_RUNS")
     rate_limit_window_s: float = Field(default=600.0, validation_alias="RATE_LIMIT_WINDOW_S")

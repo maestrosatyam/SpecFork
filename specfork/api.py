@@ -30,7 +30,8 @@ class Client:
         sandbox.configure(self.settings.sandbox_require_isolation, self.settings.sandbox_concurrency)
         self.engine = SpecFork(self.router, on_update or (lambda run: None), frame_thinking=self.settings.frame_thinking,
                                assumption_min_confidence=self.settings.assumption_min_confidence,
-                               max_assumptions=self.settings.max_assumptions)
+                               max_assumptions=self.settings.max_assumptions,
+                               assumption_requires_witness=self.settings.assumption_requires_witness)
 
     async def __aenter__(self) -> Client:
         return self

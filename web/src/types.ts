@@ -127,7 +127,15 @@ export type Run = {
   spec: string;
   preset_id?: string;
   is_sample: boolean;
-  settings: { n_samples: number; fast_model: string; deep_model: string; assumptions?: boolean };
+  settings: {
+    n_samples: number;
+    fast_model: string;
+    deep_model: string;
+    assumptions?: boolean;
+    /** Model ids used for the fan-out (round-robin). More than one = mixed-model run. */
+    implementers?: string[];
+    exception_types?: boolean;
+  };
   signature?: Signature;
   inputs: ProbeInput[];
   implementations: Implementation[];
@@ -178,6 +186,8 @@ export type CreateRunBody = {
   fast_model?: string;
   deep_model?: string;
   assumptions?: boolean;
+  /** Treat ValueError vs TypeError as different behaviours. Sent only when true. */
+  exception_types?: boolean;
 };
 
 /** POST /answers body: one of `answers[qid]` (option id) or `other[qid]` (free text, 3..300 chars) per question. */

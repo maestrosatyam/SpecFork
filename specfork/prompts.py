@@ -73,9 +73,7 @@ by the open questions listed, anything the spec states explicitly, and trivia. F
 - "alternative_example": one example call and the output the alternative would give, e.g. "f('03/04/2025') -> '2025-04-03'"
 - "confidence": 0.0-1.0, your probability that a real product owner would want to be asked this (1.0 = a
   consequential, genuinely 50/50 decision; 0.3 = most owners would accept the default without thinking)
-Be conservative: most clear specs have NO silent assumptions worth asking about. Only include an assumption if
-at least one listed probe input's output would change. Return an empty list if nothing important is left
-implicit. Reply with JSON only:
+Return an empty list if nothing important is left implicit. Reply with JSON only:
 {"assumptions": [{"question": str, "why": str, "consensus_label": str, "alternative_label": str,
                   "input_ids": [str], "alternative_example": str, "confidence": number}]}"""
 

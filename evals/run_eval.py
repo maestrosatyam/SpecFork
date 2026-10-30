@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 MODEL_FAST = "nvidia/Nemotron-3_5-Lightning"  # replaced from Settings in main()
 MODEL_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
-ASSUME_CONF, ASSUME_MAX = 0.6, 2  # replaced from Settings in main()
+ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS = 0.0, 3, False  # replaced from Settings in main()
 
 
 
@@ -96,7 +96,8 @@ async def eval_item(item: dict[str, Any], client: ModelRouter, n: int, sem: asyn
         # ---------------- B0
         r0 = new_run(f"b0-{item['id']}", item["spec"], n, None, MODEL_FAST, MODEL_DEEP)
         r0["signature"], r0["hidden_inputs"] = sig, hidden
-        eng = SpecFork(client, lambda r: None, assumption_min_confidence=ASSUME_CONF, max_assumptions=ASSUME_MAX)
+        eng = SpecFork(client, lambda r: None, assumption_min_confidence=ASSUME_CONF, max_assumptions=ASSUME_MAX,
+                       assumption_requires_witness=ASSUME_WITNESS)
         impls = await implement_many(eng, r0, item["spec"], sig, n, "b0_", seed)
         ok, k = alignment(impls, expected)
         out["conditions"]["B0"] = {"aligned": ok, "executed": k, "alignment": ok / k if k else 0.0, "questions": 0,
@@ -256,9 +257,10 @@ async def main() -> int:
     if args.items:
         wanted = set(args.items.split(","))
         items = [i for i in items if i["id"] in wanted]
-    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX
+    global MODEL_FAST, MODEL_DEEP, ASSUME_CONF, ASSUME_MAX, ASSUME_WITNESS
     settings = Settings.load(ROOT / ".env")
     ASSUME_CONF, ASSUME_MAX = settings.assumption_min_confidence, settings.max_assumptions
+    ASSUME_WITNESS = settings.assumption_requires_witness
     registry = Registry.load(settings.models_file)
     MODEL_FAST, MODEL_DEEP = registry.get(settings.fast_model).model, registry.get(settings.deep_model).model
     client = ModelRouter(registry, settings.api_keys, max_concurrency=12, default_model=settings.fast_model)
@@ -269,7 +271,7 @@ async def main() -> int:
     stamp = time.strftime("%Y%m%d-%H%M%S")
     outdir = Path(args.out)
     outdir.mkdir(parents=True, exist_ok=True)
-    meta = {"timestamp": stamp, "n": args.n, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
+    meta = {"timestamp": stamp, "n": args.n, "assumption_min_confidence": ASSUME_CONF, "max_assumptions": ASSUME_MAX, "assumption_requires_witness": ASSUME_WITNESS, "fast_model": MODEL_FAST, "deep_model": MODEL_DEEP,
             "prompt_version": prompts.PROMPT_VERSION, "wall_s": round(time.time() - t0, 1), "items": len(items)}
     (outdir / f"eval-{stamp}.json").write_text(json.dumps({"meta": meta, "results": results}, indent=1))
     summary = summarize(results, args.n)

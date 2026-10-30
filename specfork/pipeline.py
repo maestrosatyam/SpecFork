@@ -25,8 +25,10 @@ from .sandbox import check_code, exec_semaphore, run_function
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,40}$")
 MAX_INPUTS = 24
 CONSENSUS_SHARE = 0.75
-ASSUMPTION_MIN_CONFIDENCE = 0.6
-MAX_ASSUMPTIONS = 2
+# Defaults favour recall (the benchmark shows unpopular intents are mostly caught by assumption questions);
+# a stricter setting (e.g. 0.6 / 2 / witness required) asks fewer questions on clear specs. See docs/EVALUATION.md.
+ASSUMPTION_MIN_CONFIDENCE = 0.0
+MAX_ASSUMPTIONS = 3
 
 
 def _conf(a: dict[str, Any]) -> float:
@@ -241,7 +243,9 @@ def test_{fname}(args_json, expected):
 
 class SpecFork:
     def __init__(self, client: ModelRouter, notify: Callable[[dict[str, Any]], None], *, frame_thinking: bool = False,
-                 assumption_min_confidence: float = ASSUMPTION_MIN_CONFIDENCE, max_assumptions: int = MAX_ASSUMPTIONS) -> None:
+                 assumption_min_confidence: float = ASSUMPTION_MIN_CONFIDENCE, max_assumptions: int = MAX_ASSUMPTIONS,
+                 assumption_requires_witness: bool = False) -> None:
+        self.assumption_requires_witness = assumption_requires_witness
         self.frame_thinking = frame_thinking
         self.assumption_min_confidence = assumption_min_confidence
         self.max_assumptions = max_assumptions
@@ -515,8 +519,8 @@ class SpecFork:
             if not a.get("question") or not a.get("alternative_label") or _conf(a) < self.assumption_min_confidence:
                 continue
             affected = [i for i in (a.get("input_ids") or []) if isinstance(i, str) and i in valid_ids]
-            if not affected:
-                continue  # must be backed by at least one executed probe whose output would change
+            if not affected and self.assumption_requires_witness:
+                continue  # strict mode: must be backed by at least one executed probe whose output would change
             # clusters that behave like the majority on the affected inputs keep the assumption
             keep_ids = [c["id"] for c in live
                         if all(outcome_key(impls[c["representative_impl_id"]]["outcomes"].get(i)) == outcome_key(rep["outcomes"].get(i))
