@@ -54,12 +54,34 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+// Runs are private by default: the server only lists recorded samples plus run ids this browser created.
+const MY_RUNS_KEY = "specfork.myRuns";
+function myRunIds(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(MY_RUNS_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 20) : [];
+  } catch {
+    return [];
+  }
+}
+function rememberRunId(id: string): void {
+  try {
+    localStorage.setItem(MY_RUNS_KEY, JSON.stringify([id, ...myRunIds().filter((x) => x !== id)].slice(0, 20)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export const liveApi: Api = {
   mode: "live",
   health: () => http<Health>("/api/health"),
   presets: () => http<Preset[]>("/api/presets"),
-  listRuns: () => http<RunSummary[]>("/api/runs"),
-  createRun: (body) => http<{ id: string }>("/api/runs", { method: "POST", body: JSON.stringify(body) }),
+  listRuns: () => http<RunSummary[]>(`/api/runs?ids=${encodeURIComponent(myRunIds().join(","))}`),
+  createRun: async (body) => {
+    const r = await http<{ id: string }>("/api/runs", { method: "POST", body: JSON.stringify(body) });
+    rememberRunId(r.id);
+    return r;
+  },
   getRun: (id) => http<Run>(`/api/runs/${encodeURIComponent(id)}`),
   postAnswers: (id, answers) =>
     http<Run>(`/api/runs/${encodeURIComponent(id)}/answers`, { method: "POST", body: JSON.stringify({ answers }) }),

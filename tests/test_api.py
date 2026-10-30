@@ -86,3 +86,30 @@ def test_budget_cap():
     assert lim.check("a") is None
     lim.add_spend(0.02)
     assert "budget" in lim.check("a")
+
+
+async def test_security_headers_and_no_docs(api):
+    r = await api.get("/api/health")
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert (await api.get("/docs")).status_code in (404, 200) and "swagger" not in (await api.get("/docs")).text.lower()
+    assert (await api.get("/openapi.json")).headers.get("content-type", "").startswith("application/json") is False
+
+
+async def test_runs_listing_is_private(api):
+    rid = (await api.post("/api/runs", json={"spec": SPEC, "n_samples": 4})).json()["id"]
+    await asyncio.wait_for(asyncio.gather(*list(main._tasks)), timeout=30)
+    listed = {r["id"] for r in (await api.get("/api/runs")).json()}
+    assert rid not in listed  # other visitors' runs are not listed
+    mine = {r["id"] for r in (await api.get(f"/api/runs?ids={rid}")).json()}
+    assert rid in mine
+
+
+async def test_rate_limit_uses_rightmost_forwarded_for(api):
+    codes = []
+    for k in range(4):  # attacker rotates a spoofed left-most XFF value; Cloud Run appends the real IP last
+        r = await api.post("/api/runs", json={"spec": SPEC, "n_samples": 4},
+                           headers={"x-forwarded-for": f"10.0.0.{k}, 203.0.113.7"})
+        codes.append(r.status_code)
+    assert codes[3] == 429
+    await asyncio.wait_for(asyncio.gather(*list(main._tasks)), timeout=30)

@@ -16,4 +16,4 @@ COPY --from=web /web/dist ./web/dist
 RUN useradd --create-home --uid 10001 specfork && mkdir -p /tmp/specfork-runs && chown specfork /tmp/specfork-runs
 USER specfork
 EXPOSE 8080
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --no-server-header"]

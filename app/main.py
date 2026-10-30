@@ -51,7 +51,26 @@ def _harden_process() -> None:
 
 _harden_process()
 
-app = FastAPI(title="SpecFork", version=VERSION)
+app = FastAPI(title="SpecFork", version=VERSION, docs_url=None, redoc_url=None, openapi_url=None)
+
+SECURITY_HEADERS = {
+    "Content-Security-Policy": ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                                "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; "
+                                "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"),
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    return response
 store = RunStore(os.environ.get("RUNS_DIR", "/tmp/specfork-runs"))
 limiter = RateLimiter(
     per_window=int(os.environ.get("RATE_LIMIT_RUNS", "6")),
@@ -85,8 +104,11 @@ class Converge(BaseModel):
 
 
 def _client_id(request: Request) -> str:
+    """Client address for rate limiting. Cloud Run's front end APPENDS the real client address to
+    X-Forwarded-For, so only the right-most entry is trustworthy (left entries are client-supplied)."""
     fwd = request.headers.get("x-forwarded-for", "")
-    return (fwd.split(",")[0].strip() if fwd else "") or (request.client.host if request.client else "unknown")
+    last = fwd.split(",")[-1].strip() if fwd else ""
+    return last[:64] or (request.client.host if request.client else "unknown")
 
 
 def _spawn(coro: Any, run: dict[str, Any]) -> None:
@@ -127,8 +149,12 @@ async def presets() -> list[dict[str, Any]]:
 
 
 @app.get("/api/runs")
-async def list_runs() -> list[dict[str, Any]]:
-    return [summarize(r) for r in store.recent()]
+async def list_runs(ids: str = "") -> list[dict[str, Any]]:
+    """Recorded sample runs plus the runs whose ids the caller already knows (kept in its own browser).
+    Other visitors' runs are never listed."""
+    wanted = {i for i in ids.split(",")[:20] if i and len(i) <= 64 and i.replace("-", "").replace("_", "").isalnum()}
+    out = [r for r in store.recent(1000) if r.get("is_sample") or r["id"] in wanted]
+    return [summarize(r) for r in out[:40]]
 
 
 @app.post("/api/runs")
@@ -151,13 +177,25 @@ async def get_run(run_id: str) -> dict[str, Any]:
 
 
 ACTIVE = {"running", "resolving", "converging"}
+MAX_SSE = int(os.environ.get("MAX_SSE", "200"))
+_sse_open = [0]
 
 
 @app.get("/api/runs/{run_id}/events")
 async def run_events(run_id: str, request: Request) -> StreamingResponse:
     run = _get(run_id)
+    if _sse_open[0] >= MAX_SSE:
+        raise HTTPException(503, "Too many open event streams; the client will fall back to polling.")
 
     async def gen():
+        _sse_open[0] += 1
+        try:
+            async for chunk in _gen():
+                yield chunk
+        finally:
+            _sse_open[0] -= 1
+
+    async def _gen():
         last = -1
         idle = 0
         while True:
