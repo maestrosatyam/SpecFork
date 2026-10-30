@@ -100,6 +100,13 @@ export function compactLabels(all: string[]): Record<string, string> {
     if (k === 0) short = short.replace(/^NVIDIA\s+/, "");
     out[uniq[i]] = short || uniq[i];
   }
+  // After stripping a shared family, drop leading version tokens ("3.5 Lightning" -> "Lightning") if names stay unique.
+  if (k > 0) {
+    const trimmed = Object.fromEntries(
+      Object.entries(out).map(([full, short]) => [full, short.replace(/^(v?[\d.]+\s+)+/i, "") || short]),
+    );
+    if (new Set(Object.values(trimmed)).size === uniq.length) return trimmed;
+  }
   return out;
 }
 

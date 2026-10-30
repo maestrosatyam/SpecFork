@@ -249,7 +249,7 @@ async def create_run(body: CreateRun, request: Request) -> dict[str, str]:
                   implementers=implementers,
                   assumptions=st.settings.assumptions if body.assumptions is None else body.assumptions,
                   exception_types=st.settings.exception_types if body.exception_types is None else body.exception_types,
-                  adaptive_n=st.settings.adaptive_n)
+                  adaptive_n=st.settings.adaptive_n, probe_rounds=st.settings.probe_rounds)
     token = secrets.token_urlsafe(24)
     st.store.add(run)
     st.store.set_token(run["id"], token)

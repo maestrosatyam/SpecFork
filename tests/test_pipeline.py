@@ -261,3 +261,14 @@ async def test_adaptive_n_stops_early_when_behaviours_stabilise():
     assert 16 <= len(run["implementations"]) < 40  # the scripted fake has only 3 behaviours
     assert any("stopping early" in entry["msg"] for entry in run["log"])
     await client.aclose()
+
+
+async def test_second_probing_round_adds_new_inputs_and_reruns():
+    eng, client = _engine()
+    run = new_run("t11", SPEC, 8, probe_rounds=2)
+    await eng.run_all(run)
+    added = [i for i in run["inputs"] if i["source"] == "probe2"]
+    assert [i["args"] for i in added] == [{"total": 100, "n": 7}]  # duplicates of tried inputs are dropped
+    executed = [i for i in run["implementations"] if i["status"] == "executed"]
+    assert all(added[0]["id"] in i["outcomes"] for i in executed)
+    await client.aclose()

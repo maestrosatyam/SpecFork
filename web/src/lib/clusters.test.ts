@@ -199,3 +199,21 @@ describe("mock resolution with free-text answers", () => {
     expect(resolution.open_input_ids).toEqual([]);
   });
 });
+
+describe("mixed-model + exception-types mock run", () => {
+  it("round-robins implementers and types raised outcomes", async () => {
+    const { mixedSampleRun, buildResolution: br } = await import("../mock/billFixture");
+    const { modelMix } = await import("./models");
+    const run = mixedSampleRun();
+    expect(run.settings.implementers).toHaveLength(2);
+    expect(run.settings.exception_types).toBe(true);
+    expect(modelMix(run, { available: [] })?.families).toBe(2);
+    const q2 = run.questions.find((q) => q.id === "q2")!;
+    expect(q2.options[0].examples[0].value_repr).toBe("raises:ValueError");
+    const res = br(run, { q1: "q1_first", q2: "q2_raise", a0: "a0keep" }).resolution;
+    expect(res.locked_cases.some((c) => c.expected_repr === "raises:ValueError")).toBe(true);
+    expect(res.agreement_before).toBeGreaterThan(0.3);
+    expect(res.tests_code).toContain("ValueError),");
+    expect(res.tests_code).not.toContain("raises:");
+  });
+});

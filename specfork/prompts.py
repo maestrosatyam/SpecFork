@@ -31,6 +31,12 @@ unicode, ordering, duplicates, leap years, inclusive/exclusive ranges, plausible
 Every input must be valid JSON and match the parameter names and types exactly.
 Reply with JSON only: {"inputs": [{"args": {<param>: <value>}, "note": "why this probe is interesting"}]}"""
 
+PROBE_MORE_SYSTEM = """You design extra test inputs for differential testing. Several implementations of the same
+spec are shown with the inputs already tried. Propose 4-8 NEW inputs (not in the tried list) on which these
+implementations are most likely to return DIFFERENT outputs: read the code for diverging branches, rounding,
+boundaries, ordering, empty or unusual values. Inputs must be valid JSON and match the parameter names exactly.
+Reply with JSON only: {"inputs": [{"args": {<param>: <value>}, "note": "which difference this targets"}]}"""
+
 IMPLEMENT_SYSTEM = """You are a senior Python developer. Implement the requested function.
 Where the spec is silent or unclear, make the choice you personally consider most reasonable:
 do not ask questions, do not hedge, do not add parameters, do not explain.

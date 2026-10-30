@@ -53,7 +53,11 @@ def make_transport(counter: dict | None = None) -> httpx.MockTransport:
         body = json.loads(request.content)
         system = body["messages"][0]["content"]
         counter[body.get("model")] = counter.get(body.get("model"), 0) + 1
-        if "differential testing" in system:
+        if "design extra test inputs" in system:
+            content = json.dumps({"inputs": [{"args": {"total": 100, "n": 7}, "note": "remainder 2"},
+                                             {"args": {"total": 100, "n": 3}, "note": "already tried"}]})
+            reasoning = None
+        elif "differential testing" in system:
             content, reasoning = json.dumps(FRAME), "Need typed params; include remainder cases."
         elif "senior Python developer" in system:
             user = body["messages"][1]["content"]

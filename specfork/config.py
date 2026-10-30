@@ -14,6 +14,7 @@ Nothing in the ``specfork`` package reads ``os.environ`` at import time. Build a
 | ``SPECFORK_ASSUMPTION_MIN_CONFIDENCE`` / ``SPECFORK_MAX_ASSUMPTIONS`` / ``SPECFORK_ASSUMPTION_REQUIRES_WITNESS`` | 0.0 / 3 / 0 | strictness of the assumption review (strict: 0.6 / 2 / 1) |
 | ``SPECFORK_EXCEPTION_TYPES`` | ``0`` | treat different exception types as different behaviours and lock them in tests |
 | ``SPECFORK_ADAPTIVE_N`` | ``0`` | generate implementations in batches and stop when behaviours stabilise (N is the cap) |
+| ``SPECFORK_PROBE_ROUNDS`` | 1 | 2 = adaptive probing: a second round of inputs aimed at the current disagreements |
 | ``SPECFORK_DB`` | ``specfork.db`` (``""`` = memory only) | SQLite file for runs (ignored in public-demo mode) |
 | ``RATE_LIMIT_RUNS`` / ``RATE_LIMIT_WINDOW_S`` / ``DAILY_BUDGET_USD`` | 6 / 600 / 5 | abuse and cost controls |
 | ``LLM_CONCURRENCY`` | 16 | concurrent model calls |
@@ -48,6 +49,7 @@ class Settings(BaseSettings):
     assumptions: bool = Field(default=True, validation_alias="SPECFORK_ASSUMPTIONS")
     exception_types: bool = Field(default=False, validation_alias="SPECFORK_EXCEPTION_TYPES")
     adaptive_n: bool = Field(default=False, validation_alias="SPECFORK_ADAPTIVE_N")
+    probe_rounds: int = Field(default=1, ge=1, le=2, validation_alias="SPECFORK_PROBE_ROUNDS")
     assumption_min_confidence: float = Field(default=0.0, ge=0, le=1, validation_alias="SPECFORK_ASSUMPTION_MIN_CONFIDENCE")
     max_assumptions: int = Field(default=3, ge=0, le=5, validation_alias="SPECFORK_MAX_ASSUMPTIONS")
     assumption_requires_witness: bool = Field(default=False, validation_alias="SPECFORK_ASSUMPTION_REQUIRES_WITNESS")

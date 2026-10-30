@@ -108,8 +108,12 @@ describe("mixed-model fan-out breakdown", () => {
 
   it("compacts labels by their shared leading words", () => {
     expect(compactLabels(["NVIDIA Nemotron 3.5 Lightning", "NVIDIA Nemotron 3 Super"])).toEqual({
-      "NVIDIA Nemotron 3.5 Lightning": "3.5 Lightning",
-      "NVIDIA Nemotron 3 Super": "3 Super",
+      "NVIDIA Nemotron 3.5 Lightning": "Lightning",
+      "NVIDIA Nemotron 3 Super": "Super",
+    });
+    expect(compactLabels(["NVIDIA Nemotron 3 Ultra", "NVIDIA Nemotron 3 Super"])).toEqual({
+      "NVIDIA Nemotron 3 Ultra": "Ultra",
+      "NVIDIA Nemotron 3 Super": "Super",
     });
     expect(compactLabels(["NVIDIA Nemotron 3.5 Lightning", "Qwen3-Coder"])).toEqual({
       "NVIDIA Nemotron 3.5 Lightning": "Nemotron 3.5 Lightning",

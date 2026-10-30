@@ -56,7 +56,7 @@ DEFAULT_DEEP = "nvidia/Nemotron-3-Ultra-550b-a55b"
 def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None,
             fast_model: str = DEFAULT_FAST, deep_model: str = DEFAULT_DEEP, *,
             implementers: list[str] | None = None, assumptions: bool = True,
-            exception_types: bool = False, adaptive_n: bool = False) -> dict[str, Any]:
+            exception_types: bool = False, adaptive_n: bool = False, probe_rounds: int = 1) -> dict[str, Any]:
     """A fresh run record. Model arguments are model ids (or registry keys) resolved by the ModelRouter."""
     t = now()
     return {
@@ -64,7 +64,7 @@ def new_run(run_id: str, spec: str, n_samples: int, preset_id: str | None = None
         "spec": spec, "preset_id": preset_id, "is_sample": False,
         "settings": {"n_samples": n_samples, "fast_model": fast_model, "deep_model": deep_model,
                      "implementers": list(implementers or [fast_model]), "assumptions": assumptions,
-                     "exception_types": exception_types, "adaptive_n": adaptive_n,
+                     "exception_types": exception_types, "adaptive_n": adaptive_n, "probe_rounds": probe_rounds,
                      "prompt_version": prompts.PROMPT_VERSION, "prompt_hash": prompts.prompt_hash()},
         "inputs": [], "implementations": [], "clusters": [], "questions": [], "trace": [],
         "metrics": {"total_cost_usd": 0.0, "prompt_tokens": 0, "completion_tokens": 0, "n_calls": 0, "wall_time_s": 0.0},
@@ -398,6 +398,48 @@ class SpecFork:
         if st.count("executed") < 2:
             raise PipelineError("fewer than two implementations could be executed")
 
+    async def probe_more(self, run: dict[str, Any]) -> None:
+        """Adaptive probing: ask for inputs that separate the current behaviours, run every implementation on them."""
+        sig = run["signature"]
+        impls = {i["id"]: i for i in run["implementations"]}
+        reps = [impls[c["representative_impl_id"]] for c in run["clusters"] if c["kind"] == "behavior"][:4]
+        if len(reps) < 1:
+            return
+        tried = [i["args"] for i in run["inputs"]]
+        user = (f"Spec:\n{run['spec']}\n\nSignature:\n```python\n{prompts.signature_stub(sig)}\n```\n\n"
+                f"Inputs already tried:\n{json.dumps(tried)[:3000]}\n\n"
+                + "\n\n".join(f"Implementation {k + 1}:\n```python\n{(r.get('code') or '')[:1500]}\n```" for k, r in enumerate(reps)))
+        try:
+            raw = await self._json_call(run, "probe_more", prompts.PROBE_MORE_SYSTEM, user,
+                                        model=run["settings"]["fast_model"], thinking=False, max_tokens=3000, temperature=0.5)
+        except (LLMError, PipelineError) as e:
+            self._log(run, "cluster", f"Extra probing unavailable ({str(e)[:60]})")
+            return
+        seen = {json.dumps(a, sort_keys=True) for a in tried}
+        new = [x for x in validate_inputs((raw.get("inputs") if isinstance(raw, dict) else None) or [], sig, "probe2")
+               if json.dumps(x["args"], sort_keys=True) not in seen][: max(0, MAX_INPUTS + 8 - len(run["inputs"]))]
+        if not new:
+            return
+        start = len(run["inputs"])
+        added = [{"id": f"i{start + k}", **x} for k, x in enumerate(new)]
+        run["inputs"].extend(added)
+        self._log(run, "cluster", f"Second probing round: {len(added)} inputs aimed at the current disagreements")
+        payload = [{"id": i["id"], "args": i["args"]} for i in added]
+
+        async def rerun(impl: dict[str, Any]) -> None:
+            async with exec_semaphore():
+                ex = await run_function(impl["code"], sig["name"], payload)
+            if ex.ok:
+                if run["settings"].get("exception_types"):
+                    for o in ex.outcomes.values():
+                        if not o.get("ok"):
+                            o["value_repr"] = f"raises:{o.get('error_type') or 'Exception'}"
+                impl["outcomes"].update(ex.outcomes)
+            else:
+                impl["status"], impl["reject_reason"] = "error", f"execution failed: {ex.error}"
+
+        await asyncio.gather(*(rerun(i) for i in run["implementations"] if i["status"] == "executed"))
+
     # ---- stage 4
     def cluster(self, run: dict[str, Any]) -> list[Any]:
         run["stage"] = "cluster"
@@ -574,6 +616,9 @@ class SpecFork:
             await self.frame(run)
             await self.fanout(run)
             axes = self.cluster(run)
+            if run["settings"].get("probe_rounds", 1) > 1:
+                await self.probe_more(run)
+                axes = self.cluster(run)
             await self.explain(run, axes)
             run["stage"] = "done"
             run["status"] = "awaiting_answers"

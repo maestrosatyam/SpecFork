@@ -52,7 +52,7 @@ class Client:
                       implementers=[self.registry.get(k).model for k in impl_keys],
                       assumptions=self.settings.assumptions if assumptions is None else assumptions,
                       exception_types=self.settings.exception_types if exception_types is None else exception_types,
-                      adaptive_n=self.settings.adaptive_n)
+                      adaptive_n=self.settings.adaptive_n, probe_rounds=self.settings.probe_rounds)
         if signature:
             run["signature"] = {**signature, "docstring": signature.get("docstring", "")}
         return run
