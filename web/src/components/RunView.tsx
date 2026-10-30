@@ -7,6 +7,7 @@ import {
   answerableQuestions,
   answeredCount as countAnswered,
   assumptionQuestions,
+  openQuestions,
   answersFromRun,
   buildAnswersBody,
   clusterStyles,
@@ -18,7 +19,7 @@ import { useRun } from "../lib/useRun";
 import type { Implementation, Run, RunStatus } from "../types";
 import { IconAlert, IconArrowRight, IconInfo, IconTerminal } from "./Icons";
 import { ClusterLegend, GridStatusLegend, ImplGrid, type Focus } from "./ImplGrid";
-import { AssumptionsIntro, ClusterBar, LikelyBugs, LockBar, MeaningsHeader, QuestionCard } from "./Meanings";
+import { AssumptionsIntro, ClusterBar, LikelyBugs, LockBar, MeaningsHeader, OpenQuestions, QuestionCard } from "./Meanings";
 import { LiveLog, Stepper } from "./Pipeline";
 import { ResolutionView } from "./Resolution";
 import { TraceSummary } from "./Trace";
@@ -484,6 +485,12 @@ function RunBody({
                     onHover={setHover}
                   />
                 ))}
+                <OpenQuestions
+                  questions={openQuestions(run.questions)}
+                  other={other}
+                  readOnly={locked}
+                  onChange={(qid, text) => chooseOther(qid, text)}
+                />
                 <LikelyBugs run={run} styles={styles} />
                 {run.status !== "error" && (
                   <LockBar

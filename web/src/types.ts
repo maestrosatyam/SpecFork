@@ -64,7 +64,8 @@ export type Question = {
   id: string;
   text: string;
   why: string;
-  kind: "ambiguity" | "likely_bug" | "assumption";
+  /** "open": optional question the executed examples couldn't cover; no options, answered only via `other` free text. */
+  kind: "ambiguity" | "likely_bug" | "assumption" | "open";
   witness_input_ids: string[]; // may be empty for assumptions
   affected_input_ids?: string[]; // assumption: inputs whose expected value depends on it
   agree_count?: number; // assumption: implementations sharing the consensus behaviour

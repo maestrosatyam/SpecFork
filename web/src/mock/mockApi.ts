@@ -241,8 +241,12 @@ class MockServer {
     this.checkToken(id, token);
     if (run.resolution || run.status === "resolving") throw new MockHttpError(409, "This run is already resolved.");
     const answers = body.answers ?? {};
-    const other = body.other ?? {};
-    for (const [qid, text] of Object.entries(other)) {
+    const openIds = new Set(run.questions.filter((q) => q.kind === "open").map((q) => q.id));
+    const allOther = body.other ?? {};
+    // Open questions are answered only in free text and don't need an implementation; keep them apart.
+    const other = Object.fromEntries(Object.entries(allOther).filter(([qid]) => !openIds.has(qid)));
+    const openOther = Object.fromEntries(Object.entries(allOther).filter(([qid]) => openIds.has(qid)));
+    for (const [qid, text] of Object.entries(allOther)) {
       const t = text.trim();
       if (t.length < 3 || t.length > 300) throw new MockHttpError(422, "Your own answer must be 3 to 300 characters.");
       if (answers[qid]) throw new MockHttpError(422, "Send either an option or your own answer per question, not both.");
@@ -275,6 +279,17 @@ class MockServer {
           resolution.answers[q.id] = oid;
         });
         run.log.push({ t: now(), stage: "resolve", msg: `Wrote and executed a reference implementation for your own answer${Object.keys(other).length === 1 ? "" : "s"}` });
+      }
+      // Open questions: the backend appends the text as a custom option (no examples) and folds it into the spec.
+      for (const q of run.questions) {
+        const t = openOther[q.id]?.trim();
+        if (q.kind !== "open" || !t) continue;
+        const oid = `${q.id}other`;
+        q.options.push({ id: oid, label: t, is_custom: true, cluster_ids: [], impl_count: 0, examples: [] });
+        q.answer_option_id = oid;
+        resolution.answers[q.id] = oid;
+        resolution.decisions.push(`${q.text} → ${t}`);
+        resolution.clarified_spec = `${resolution.clarified_spec} ${t.replace(/\s*$/, "").replace(/([^.!?])$/, "$1.")}`;
       }
       run.resolution = resolution;
       run.trace.push(trace);

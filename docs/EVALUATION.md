@@ -1,6 +1,6 @@
 # Evaluation results
 
-## v0.2.0 (2026-10-30): six full runs after the refactor
+## v0.2.0 (2026-10-30): eight full runs, including a re-run of the pre-refactor code
 
 Every run used the same 32-spec benchmark and N=12 implementations per condition, live on Nebius Token Factory
 (NVIDIA Nemotron 3.5 Lightning and NVIDIA Nemotron 3 Ultra). Intervals are 95% percentile bootstrap over items.
@@ -14,30 +14,35 @@ The raw JSON for each run is in [`docs/results/`](results/).
 | v4 (`v4-defaults`) | restored defaults | 29.6% (15–46%) | 48.5% (31–66%) | 21.7% (9–36%) | 1.67 |
 | v5 (`v5-freetext`) | defaults; the simulated owner may answer in free text | 29.8% (16–45%) | 42.3% (28–58%) | 21.2% (9–35%) | 2.67 |
 | v6 (`v6-mixed`) | defaults + mixed fan-out (Nemotron 3.5 Lightning + Qwen3 30B) | **35.0%** (20–52%) | 46.0% (31–61%) | 19.9% (8–34%) | 2.33 |
+| v1-rerun (`v1code-rerun`) | **the pre-refactor code (commit 78048a2), re-run today** | 30.8% | 48.8% | 22.4% | 1.83 |
+| v7 (`v7-nojsonmode`) | defaults, JSON mode off for Lightning (ablation) | 33.1% (18–50%) | 49.2% (33–66%) | 18.0% (6–32%) | 2.60 |
+
+**Pooled over the five runs with default settings** (v1, v1-rerun, v4, v5, v7; per-item means): SpecFork **33.1%**,
+ask-first **45.7%**, no clarification **20.8%**.
 
 What this shows, plainly:
-- **SpecFork does not beat a well-prompted ask-first baseline on intent alignment.** After the refactor it
-  scored 22–35% against the baseline's 39–49%. The single pre-refactor run (41.9%) has not been reproduced. The
-  confidence intervals overlap with it, so part of the gap may be run-to-run noise, but we treat it as a
-  regression until shown otherwise. Both approaches beat no clarification (about 21%).
-- **Assumption calibration is a real trade-off.** Fewer questions on clear specs (2.0 → 0.83) came with lower
-  accuracy on ambiguous specs, because on this benchmark the owner's intent is often an unpopular convention that
-  only an assumption question surfaces. Defaults favour recall; `SPECFORK_ASSUMPTION_MIN_CONFIDENCE`,
-  `SPECFORK_MAX_ASSUMPTIONS` and `SPECFORK_ASSUMPTION_REQUIRES_WITNESS` turn on the strict mode. The review's
-  target (≤ 0.5 false-alarm questions with no alignment loss) is **not met**.
-- **Free-text answers work but did not move the metric.** The simulated owner used them in 4 of 26 items, and
-  the three items they were meant to fix (`moving_average`, `split_full_name`, `shift_length`) did not improve.
-- **Mixed-model fan-out was the best post-refactor configuration** (35.0% against 29.8% single-model, same
-  owner). That is one run, so treat it as a lead, not a result.
-- **Clear specs stay correct.** SpecFork keeps 92–100% alignment on the controls, but asks 1.7–2.7 unnecessary
-  questions per spec at default settings.
-- **What only SpecFork produces** is unchanged: an executed witness for every question, deterministic locked
-  tests, and a measured re-fork. The baseline produces none of these.
+- **The refactor did not cause the drop.** The exact pre-refactor code, re-run today, scores 30.8%, in the same
+  range as the refactored code. Turning off the one suspicious change (JSON mode) gives 33.1%. The v1 figure of
+  41.9% was a favourable single run, and the earlier "tie with ask-first" claim does not hold up.
+- **SpecFork trails a well-prompted ask-first baseline by about 13 points on intent alignment.** Both clearly beat
+  no clarification.
+- **Why it loses.** SpecFork's questions are well chosen and backed by executed witnesses, but answers are limited
+  to behaviours some sample produced, so intent the owner has but no sample showed gets lost:
+  - `shipping_cost`: the witness covered negative weights; the owner meant "≤ 0 raises", so 0 kg kept a price.
+  - `normalize_phone`: the closest available option contradicted the intent.
 
-Next steps are tracked in [ROADMAP.md](ROADMAP.md):
-- find the cause of the gap against v1 (prompt or JSON-mode differences in the simulated owner and framing calls);
-- run multi-seed runs with `--repeats`;
-- add a free-text condition that forces "Other" when no option matches.
+  The ask-first baseline lets the owner state rules in their own words. Where the deciding behaviour only shows up
+  when code runs, SpecFork wins clearly (`page_count` +42 points, `cart_discounts` +25 over ask-first).
+- **Assumption calibration is a real trade-off.** Fewer questions on clear specs (2.0 → 0.83) came with lower
+  accuracy on ambiguous specs. Defaults favour recall. The review's target (≤ 0.5 false-alarm questions with no
+  alignment loss) is **not met**.
+- **Free-text "Other…" answers** were used in 4 of 26 items without moving the metric.
+- **Mixed-model fan-out** (35.0%) was the best configuration in one run. Treat it
+  as a lead.
+- **What only SpecFork produces:** an executed witness for every question, deterministic locked tests, and a
+  measured re-fork.
+
+<!-- OPEN_QUESTIONS_RESULT -->
 
 ---
 

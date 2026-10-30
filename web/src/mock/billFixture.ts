@@ -525,6 +525,14 @@ export function buildBillRun(opts: BuildOpts): Run {
       },
     ],
   });
+  questions.push({
+    id: "o0",
+    kind: "open",
+    text: "Should the result be rounded for display only, or should callers be able to rely on the shares summing to the exact total?",
+    why: "",
+    witness_input_ids: [],
+    options: [],
+  });
   // Server sends impl_count on every option.
   for (const q of questions)
     for (const o of q.options) {

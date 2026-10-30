@@ -11,6 +11,7 @@ import {
   allAmbiguitiesAnswered,
   allAnswered,
   answerableQuestions,
+  openQuestions,
   optionCompatible,
   optionCount,
   clusterStyles,
@@ -215,5 +216,25 @@ describe("mixed-model + exception-types mock run", () => {
     expect(res.agreement_before).toBeGreaterThan(0.3);
     expect(res.tests_code).toContain("ValueError),");
     expect(res.tests_code).not.toContain("raises:");
+  });
+});
+
+describe("open (optional) questions", () => {
+  const required = { q1: "q1_first", q2: "q2_raise", a0: "a0keep" };
+  it("are not required and don't count toward x of y answered", () => {
+    expect(openQuestions(run.questions).map((q) => q.id)).toEqual(["o0"]);
+    expect(answerableQuestions(run.questions).map((q) => q.id)).not.toContain("o0");
+    expect(allAnswered(run.questions, required)).toBe(true);
+    expect(answeredCount(run.questions, required, { o0: "Shares must sum exactly." })).toBe(3);
+  });
+  it("send their text in `other` only when it is long enough", () => {
+    const body = buildAnswersBody(run.questions, required, { o0: "  Shares must always sum to the total.  " });
+    expect(body.answers).toEqual(required);
+    expect(body.other).toEqual({ o0: "Shares must always sum to the total." });
+    expect(buildAnswersBody(run.questions, required, { o0: "ok" }).other).toEqual({});
+    expect(buildAnswersBody(run.questions, required, {}).other).toEqual({});
+  });
+  it("never constrain cluster highlighting", () => {
+    expect(activeClusterIds(run.questions, { o0: "o0other" })).toBeNull();
   });
 });

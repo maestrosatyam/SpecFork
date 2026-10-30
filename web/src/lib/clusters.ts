@@ -91,6 +91,11 @@ export function optionCompatible(
   return opt.cluster_ids.some((id) => alive.has(id));
 }
 
+/** Optional free-text questions ("Anything else?"). Never required for locking in. */
+export function openQuestions(qs: Question[]): Question[] {
+  return qs.filter((q) => q.kind === "open");
+}
+
 /** Options that never constrain cluster highlighting: assumption overrides and the user's own free-text answers. */
 export function ignoresClusters(opt: QuestionOption): boolean {
   return !!opt.is_alternative || !!opt.is_custom;
@@ -144,6 +149,9 @@ export function buildAnswersBody(
     if (a && q.options.some((o) => o.id === a)) outA[q.id] = a;
     else if (otherValid(other[q.id])) outO[q.id] = other[q.id].trim().slice(0, OTHER_MAX);
   }
+  // Optional open questions: free text only, sent when given.
+  for (const q of openQuestions(questions))
+    if (otherValid(other[q.id])) outO[q.id] = other[q.id].trim().slice(0, OTHER_MAX);
   return { answers: outA, other: outO };
 }
 

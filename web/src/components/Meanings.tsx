@@ -653,3 +653,88 @@ export function LockBar({
     </div>
   );
 }
+
+/** Optional "Anything else?" questions: free text only, never required for locking in. */
+export function OpenQuestions({
+  questions,
+  other,
+  readOnly,
+  onChange,
+}: {
+  questions: Question[];
+  other: Record<string, string>;
+  readOnly: boolean;
+  onChange: (qid: string, text: string) => void;
+}) {
+  if (!questions.length) return null;
+  return (
+    <section className="space-y-4" aria-labelledby="open-h">
+      <div className="pt-2">
+        <p className="eyebrow">Open questions</p>
+        <h2 id="open-h" className="mt-1 font-display text-[24px] font-semibold text-fog-50 sm:text-[28px]">
+          Anything else? <span className="text-fog-400">(optional)</span>
+        </h2>
+        <p className="mt-1.5 max-w-[860px] text-[15.5px] leading-relaxed text-fog-400">
+          Questions the executed examples could not cover. Answer in your own words, or skip.
+        </p>
+      </div>
+      {questions.map((q, i) => {
+        const taId = `open-${q.id}`;
+        const text = other[q.id] ?? "";
+        const len = text.trim().length;
+        const tooShort = len > 0 && len < OTHER_MIN;
+        const saved = q.options.find((o) => o.id === q.answer_option_id) ?? q.options.find((o) => o.is_custom);
+        const answer = saved?.label ?? (len >= OTHER_MIN ? text.trim() : "");
+        return (
+          <div key={q.id} className="card p-5 sm:p-6">
+            <div className="flex items-start gap-4">
+              <span
+                className={`flex h-9 min-w-9 items-center justify-center rounded-lg px-2 font-display text-[15px] font-bold ${
+                  answer ? "bg-fog-100 text-ink-900" : "bg-white/[0.07] text-fog-200"
+                }`}
+              >
+                {answer ? <IconCheck size={17} strokeWidth={2.6} /> : `O${i + 1}`}
+              </span>
+              <div className="min-w-0 flex-1">
+                <label htmlFor={readOnly ? undefined : taId} className="block font-display text-[19px] font-semibold leading-snug text-fog-50 sm:text-[21px]">
+                  {q.text}
+                </label>
+                {q.why && <p className="mt-1.5 text-[15px] leading-relaxed text-fog-400">{q.why}</p>}
+                {readOnly ? (
+                  answer ? (
+                    <div className="mt-3 rounded-xl border border-fog-100/30 bg-white/[0.04] px-4 py-3">
+                      <div className="text-[12px] font-semibold uppercase tracking-wider text-fog-400">Your answer</div>
+                      <p className="mt-1 whitespace-pre-line text-[15.5px] leading-relaxed text-fog-50">{answer}</p>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[14px] text-fog-500">Skipped.</p>
+                  )
+                ) : (
+                  <div className="mt-3">
+                    <textarea
+                      id={taId}
+                      value={text}
+                      maxLength={OTHER_MAX}
+                      rows={2}
+                      onChange={(e) => onChange(q.id, e.target.value)}
+                      placeholder="Your answer (optional)"
+                      aria-invalid={tooShort}
+                      aria-describedby={`${taId}-help`}
+                      className="block w-full resize-y rounded-xl border border-white/10 bg-ink-950/60 px-3 py-2.5 text-[15px] leading-relaxed text-fog-50 placeholder:text-fog-500/70 focus:border-accent/60 focus:outline-none focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-warn/50"
+                    />
+                    <p id={`${taId}-help`} className={`mt-1.5 flex justify-between gap-2 text-[12.5px] ${tooShort ? "text-warn" : "text-fog-500"}`}>
+                      <span>{tooShort ? `At least ${OTHER_MIN} characters, or leave it empty.` : "Optional. Folded into the clarified spec."}</span>
+                      <span className="tabular-nums">
+                        {text.length}/{OTHER_MAX}
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
