@@ -39,10 +39,12 @@ Reply with JSON only: {"inputs": [{"args": {<param>: <value>}, "note": "which di
 
 OPEN_SYSTEM = """You are a careful software engineer about to implement the function spec below. Some clarifying
 questions will already be asked, each backed by executed examples; they are listed. List at most 3 ADDITIONAL
-clarifying questions whose answers would change the function's behaviour and that the listed questions do not
-already cover: think about input validation and error handling (which inputs are invalid, and exactly what happens
-then), the exact output format, boundary values, and rules the spec leaves implicit. Ask only about things a
-product owner can answer in one sentence. Return an empty list if nothing important is left.
+clarifying questions, but only questions whose answers would change what the function returns (or whether it
+raises) for inputs a caller would realistically pass: exact output format, boundary values the spec mentions,
+which realistic inputs are invalid and what happens then, rules the spec clearly leaves open.
+Do NOT ask about exotic inputs (wrong types, None, NaN, absolute limits, unicode corner cases, performance,
+implementation technique) unless the spec is about them. If the spec and the listed questions already pin the
+behaviour down, return an empty list; most clear specs need no additional questions.
 Reply with JSON only: {"questions": [str]}"""
 
 IMPLEMENT_SYSTEM = """You are a senior Python developer. Implement the requested function.
