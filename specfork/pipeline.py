@@ -736,9 +736,11 @@ class SpecFork:
             if custom_qs:
                 self._log(run, "resolve", f"Implementing your own answer(s) with {run['settings']['deep_model']} and executing them")
                 custom = None
-                for k, model in enumerate((run["settings"]["deep_model"], run["settings"]["fast_model"])):
+                attempts = (run["settings"]["deep_model"], run["settings"]["deep_model"],
+                            run["settings"]["fast_model"], run["settings"]["fast_model"])
+                for k, model in enumerate(attempts):
                     impl = {"id": f"u{k}", "index": len(run["implementations"]), "model": model, "status": "pending"}
-                    seed = int(hashlib.sha256(clarified.encode()).hexdigest()[:6], 16)
+                    seed = int(hashlib.sha256(clarified.encode()).hexdigest()[:6], 16) + k
                     await self._one_impl(run, impl, clarified, run["inputs"], seed, "implement_custom")
                     if impl["status"] == "executed":
                         custom = impl
