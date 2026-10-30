@@ -49,6 +49,8 @@ class RunStore:
         if len(live) > self.max_runs:
             for r in sorted(live, key=lambda r: r["created_at"])[: len(live) - self.max_runs]:
                 self.runs.pop(r["id"], None)
+                self.versions.pop(r["id"], None)
+                self.events.pop(r["id"], None)
         self.touch(run)
 
     def touch(self, run: dict[str, Any]) -> None:
@@ -94,6 +96,9 @@ class RateLimiter:
         self._roll()
         if self.spent >= self.daily_budget_usd:
             return "The public demo's daily inference budget is used up. Sample runs remain available; please try again tomorrow."
+        if len(self.hits) > 5000:  # bound memory: forget idle clients
+            for k in [k for k, v in self.hits.items() if not v][:2500]:
+                self.hits.pop(k, None)
         q = self.hits[client]
         t = time.monotonic()
         while q and t - q[0] > self.window_s:
@@ -101,6 +106,12 @@ class RateLimiter:
         if len(q) >= self.per_window:
             return f"Rate limit: at most {self.per_window} live runs per {int(self.window_s // 60)} minutes per visitor."
         q.append(t)
+        return None
+
+    def budget_message(self) -> str | None:
+        self._roll()
+        if self.spent >= self.daily_budget_usd:
+            return "The public demo's daily inference budget is used up. Sample runs remain available; please try again tomorrow."
         return None
 
     def add_spend(self, usd: float) -> None:

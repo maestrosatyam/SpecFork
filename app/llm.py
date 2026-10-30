@@ -205,7 +205,7 @@ class NebiusClient:
 
 def extract_json(text: str) -> Any:
     """Parse the first JSON object/array found in a model reply (tolerates code fences / prose)."""
-    text = text.strip()
+    text = text.strip()[:200_000]  # bound the work done on model output
     fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
     if fence:
         text = fence.group(1).strip()
@@ -214,8 +214,16 @@ def extract_json(text: str) -> Any:
     except json.JSONDecodeError:
         pass
     for open_c, close_c in (("{", "}"), ("[", "]")):
+        first, last = text.find(open_c), text.rfind(close_c)
+        if first != -1 and last > first:  # common case: one object surrounded by prose
+            try:
+                return json.loads(text[first : last + 1])
+            except json.JSONDecodeError:
+                pass
         start = text.find(open_c)
-        while start != -1:
+        attempts = 0
+        while start != -1 and attempts < 8:  # bounded: hostile output cannot make this quadratic
+            attempts += 1
             depth = 0
             in_str = False
             esc = False

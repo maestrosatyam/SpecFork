@@ -41,7 +41,7 @@ def test_canon_normalisation():
 @pytest.mark.parametrize("code,reason", [
     ("import os\ndef f(x): return x", "import of 'os'"),
     ("def f(x): return open('/etc/passwd').read()", "name 'open'"),
-    ("def f(x): return x.__class__.__mro__", "dunder attribute"),
+    ("def f(x): return x.__class__.__mro__", "not allowed"),
     ("def f(x): return getattr(x, 'y')", "name 'getattr'"),
     ("def f(x): return eval('1')", "name 'eval'"),
     ("import subprocess\ndef f(x): return 1", "import of 'subprocess'"),
@@ -49,7 +49,9 @@ def test_canon_normalisation():
     ("print('hi')\ndef f(x): return 1", "top-level statement"),
     ("def g(x): return 1", "function 'f' not defined"),
     ("def f(x) return 1", "syntax error"),
-    ("def f(x): return '{0.__class__}'.format(x)", "suspicious dunder"),
+    ("def f(x): return '{0.__class__}'.format(x)", "not allowed"),
+    ("def f(x): return '{0.gi_frame}'.format(x)", "not allowed"),
+    ("def f(x): return '{0[a]}'.format(x)", "not allowed"),
 ])
 def test_static_rejections(code, reason):
     r = check_code(code, "f")
@@ -151,3 +153,38 @@ async def test_legit_stdlib_usage_still_works():
     assert check_code(code, "f").ok
     res = await run_function(code, "f", [{"id": "a", "args": {"x": 1}}])
     assert res.outcomes["a"] == {"ok": True, "value_repr": "[2, 2.5, '2024-03-01', 2.68, 'a', 'a b', '0.33']"}
+
+
+# ---- regressions from the 2026-10-30 independent security review
+@pytest.mark.parametrize("code", [
+    # match-class keyword patterns name attributes as plain strings
+    "from collections import namedtuple\ndef f(x):\n    match namedtuple:\n        case object(__globals__=g):\n            return g\n",
+    "def f(x):\n    match x:\n        case {'a': 1}:\n            return 1\n    return 0\n",
+    # unbound str.format reference
+    "def f(x):\n    fm = str.format\n    return fm('{0}', x)\n",
+    # dunder keyword argument names
+    "def f(x):\n    return dict(__globals__=1)\n",
+])
+def test_review_gadgets_rejected(code):
+    assert not check_code(code, "f").ok
+
+
+async def test_unbounded_output_is_capped():
+    # passes the static check; prints far more than the cap
+    code = "def f(x):\n    s = 'x' * 1000000\n    for i in range(300):\n        print(s)\n    return 1\n"
+    assert check_code(code, "f").ok
+    res = await run_function(code, "f", [{"id": "a", "args": {"x": 1}}])
+    assert not res.ok and res.error == "output too large"
+
+
+async def test_no_process_creation_in_child():
+    # simulate code that got past the static layer: the harness itself must forbid new processes
+    import json as _json
+    import subprocess as _sp
+    import sys as _sys
+    payload = {"code": "import os\ndef f(x):\n    return os.fork()\n", "func": "f", "inputs": [{"id": "a", "args": {"x": 1}}],
+               "timeout": 1, "allowed_imports": ["os"]}
+    out = _sp.run([_sys.executable, "-I", "-S", "app/_harness.py"], input=_json.dumps(payload).encode(),
+                  capture_output=True, env={"PATH": "/usr/bin:/bin"}, timeout=20).stdout
+    res = _json.loads(out)
+    assert res["outcomes"]["a"]["ok"] is False  # BlockingIOError / PermissionError from RLIMIT_NPROC

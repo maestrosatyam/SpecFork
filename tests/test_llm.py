@@ -66,3 +66,12 @@ async def test_client_error_raises_and_records():
 async def test_unconfigured():
     with pytest.raises(LLMError):
         await NebiusClient(api_key="").chat([])
+
+
+def test_extract_json_is_bounded_on_hostile_output():
+    import time
+    hostile = "{" * 40000
+    t0 = time.perf_counter()
+    with pytest.raises(ValueError):
+        extract_json(hostile)
+    assert time.perf_counter() - t0 < 2.0

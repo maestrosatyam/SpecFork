@@ -13,6 +13,7 @@ so both may be adversarial / prompt-injected):
 from __future__ import annotations
 
 import ast
+import re
 import asyncio
 import json
 import os
@@ -42,6 +43,8 @@ BANNED_ATTRS = {
 }
 MAX_CODE_CHARS = 12_000
 HARNESS = Path(__file__).with_name("_harness.py")
+# When set, the harness refuses to run model code unless it could drop network access (user+net namespace).
+REQUIRE_ISOLATION = os.environ.get("SANDBOX_REQUIRE_ISOLATION", "0") == "1"
 
 
 @dataclass
@@ -58,7 +61,27 @@ def check_code(code: str, func_name: str) -> StaticCheck:
     except SyntaxError as e:
         return StaticCheck(False, f"syntax error: {e.msg} (line {e.lineno})")
     found = False
+    # `.format` is only allowed as a direct call on a string literal with simple fields ("{:.2f}", "{0}", "{name}").
+    safe_format_attrs = {id(n.func) for n in ast.walk(tree)
+                         if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "format"
+                         and isinstance(n.func.value, ast.Constant) and isinstance(n.func.value.value, str)
+                         and _simple_format_fields(n.func.value.value)}
     for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in ("format", "format_map") and id(node) not in safe_format_attrs:
+            return StaticCheck(False, "str.format not allowed except on literal templates with simple fields")
+        if isinstance(node, (ast.Match, ast.MatchClass, ast.MatchMapping, ast.MatchAs, ast.MatchStar)):
+            return StaticCheck(False, "match statements are not allowed")
+        # Catch-all: every identifier stored anywhere in the tree (attribute names, keyword-argument names,
+        # import aliases, parameter names...) must be neither private/dunder nor a known escape gadget.
+        for field, value in ast.iter_fields(node):
+            if isinstance(node, ast.Constant) or field in ("type_comment", "kind", "tag"):
+                continue
+            names = [value] if isinstance(value, str) else [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
+            for ident in names:
+                if ident.startswith("__") and ident != "__name__":
+                    return StaticCheck(False, f"dunder identifier '{ident}' not allowed")
+                if field in ("attr", "arg", "kwd_attrs") and (ident.startswith("_") or ident in BANNED_ATTRS):
+                    return StaticCheck(False, f"identifier '{ident}' not allowed")
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             mods = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""]
             for m in mods:
@@ -81,7 +104,7 @@ def check_code(code: str, func_name: str) -> StaticCheck:
         elif isinstance(node, (ast.AsyncFunctionDef, ast.Await, ast.AsyncFor, ast.AsyncWith)):
             return StaticCheck(False, "async code not allowed")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and "__" in node.value:
-            return StaticCheck(False, "suspicious dunder string")
+            return StaticCheck(False, "dunder strings not allowed")
         elif isinstance(node, ast.alias) and (node.name.startswith("_") or node.name in BANNED_ATTRS):
             return StaticCheck(False, f"import of name '{node.name}' not allowed")
         if isinstance(node, ast.FunctionDef) and node.name == func_name:
@@ -100,11 +123,30 @@ def check_code(code: str, func_name: str) -> StaticCheck:
     return StaticCheck(True)
 
 
+def _simple_format_fields(template: str) -> bool:
+    """True when every replacement field is a bare position/name (no attribute or index lookups)."""
+    import string
+
+    try:
+        parsed = list(string.Formatter().parse(template))
+    except ValueError:
+        return False
+    for _, field, spec, _ in parsed:
+        if field and ("." in field or "[" in field):
+            return False
+        # nested fields inside a format spec ("{:>{w}}") are looked up too: they must be bare as well
+        for nested in re.findall(r"\{([^{}]*)\}", spec or ""):
+            if "." in nested or "[" in nested:
+                return False
+    return True
+
+
 @dataclass
 class ExecResult:
     ok: bool
     outcomes: dict[str, dict[str, Any]]
     error: str | None = None
+    net_isolated: bool | None = None
 
 
 async def run_function(
@@ -117,29 +159,79 @@ async def run_function(
     """Run ``func_name`` from ``code`` on each input ({"id", "args"}) in an isolated subprocess."""
     payload = json.dumps({
         "code": code, "func": func_name, "inputs": inputs, "timeout": per_call_timeout_s,
-        "allowed_imports": sorted(ALLOWED_IMPORTS),
+        "allowed_imports": sorted(ALLOWED_IMPORTS), "require_isolation": REQUIRE_ISOLATION,
     })
     with tempfile.TemporaryDirectory(prefix="specfork-") as tmp:
         proc = await asyncio.create_subprocess_exec(
             sys.executable, "-I", "-S", str(HARNESS),
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
             cwd=tmp, env={"PATH": "/usr/bin:/bin", "PYTHONHASHSEED": "0", "LANG": "C.UTF-8"},
+            start_new_session=True,  # own process group, so everything it spawns can be killed together
         )
         try:
-            out, err = await asyncio.wait_for(proc.communicate(payload.encode()), timeout=total_timeout_s)
+            out = await asyncio.wait_for(_bounded_exchange(proc, payload.encode()), timeout=total_timeout_s)
         except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()
             return ExecResult(False, {}, "process timeout")
-    if len(out) > 4_000_000:
-        return ExecResult(False, {}, "output too large")
+        except OutputTooLarge:
+            return ExecResult(False, {}, "output too large")
+        finally:
+            _kill_group(proc)
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                pass
     try:
         data = json.loads(out.decode() or "{}")
-    except json.JSONDecodeError:
-        return ExecResult(False, {}, f"harness failure: {err.decode()[-300:]}")
-    if not data.get("ok"):
-        return ExecResult(False, {}, data.get("error", "unknown"))
-    return ExecResult(True, data["outcomes"])
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError):
+        return ExecResult(False, {}, "harness returned invalid output")
+    if not isinstance(data, dict) or not data.get("ok") or not isinstance(data.get("outcomes"), dict):
+        err = data.get("error", "unknown") if isinstance(data, dict) else "unknown"
+        return ExecResult(False, {}, str(err)[:200])
+    return ExecResult(True, data["outcomes"], net_isolated=bool(data.get("net_isolated")))
+
+
+async def selftest() -> dict[str, Any]:
+    """Run a trivial function through the full sandbox and report the isolation actually in effect."""
+    res = await run_function("def f(x):\n    return x + 1\n", "f", [{"id": "a", "args": {"x": 1}}])
+    return {"ok": res.ok and res.outcomes.get("a", {}).get("value_repr") == "2", "net_isolated": res.net_isolated,
+            "require_isolation": REQUIRE_ISOLATION, "error": res.error}
+
+
+MAX_OUTPUT_BYTES = 4_000_000
+
+
+class OutputTooLarge(Exception):
+    pass
+
+
+async def _bounded_exchange(proc: asyncio.subprocess.Process, payload: bytes) -> bytes:
+    """Send the payload, then read stdout with a hard cap (never buffer unbounded child output)."""
+    assert proc.stdin is not None and proc.stdout is not None
+    try:
+        proc.stdin.write(payload)
+        await proc.stdin.drain()
+        proc.stdin.close()
+    except (BrokenPipeError, ConnectionResetError):
+        pass
+    chunks, total = [], 0
+    while True:
+        chunk = await proc.stdout.read(65536)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_OUTPUT_BYTES:
+            raise OutputTooLarge()
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _kill_group(proc: asyncio.subprocess.Process) -> None:
+    import signal
+
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
 
 
 _EXEC_SEM: asyncio.Semaphore | None = None
@@ -148,5 +240,5 @@ _EXEC_SEM: asyncio.Semaphore | None = None
 def exec_semaphore() -> asyncio.Semaphore:
     global _EXEC_SEM
     if _EXEC_SEM is None:
-        _EXEC_SEM = asyncio.Semaphore(max(2, min(8, (os.cpu_count() or 2) * 2)))
+        _EXEC_SEM = asyncio.Semaphore(int(os.environ.get("SANDBOX_CONCURRENCY", "0")) or max(2, min(8, (os.cpu_count() or 2) * 2)))
     return _EXEC_SEM

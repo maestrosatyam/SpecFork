@@ -224,7 +224,8 @@ class SpecFork:
         self.notify = notify
 
     def _log(self, run: dict[str, Any], stage: str, msg: str) -> None:
-        run["log"].append({"t": now(), "stage": stage, "msg": msg})
+        run["log"].append({"t": now(), "stage": stage, "msg": msg[:400]})
+        del run["log"][:-200]
         run["updated_at"] = now()
         self.notify(run)
 
@@ -501,7 +502,7 @@ class SpecFork:
         except (PipelineError, LLMError) as e:
             run["status"], run["error"] = "error", str(e)[:400]
         except Exception as e:  # noqa: BLE001 - surface unexpected failures to the UI
-            run["status"], run["error"] = "error", f"internal error: {type(e).__name__}: {str(e)[:200]}"
+            run["status"], run["error"] = "error", f"internal error ({type(e).__name__})"
         finally:
             run["metrics"]["wall_time_s"] = round(run["metrics"]["wall_time_s"] + time.perf_counter() - t0, 2)
             self._log(run, run["stage"], "Ready for your answers" if run["status"] == "awaiting_answers" else f"Stopped: {run.get('error')}")
@@ -537,7 +538,7 @@ class SpecFork:
                                   "example": f"{run['signature']['name']}(**{json.dumps(next(i for i in run['inputs'] if i['id'] == ex['input_id'])['args'])}) -> {ex['value_repr']}"})
             unknown = set(answers) - set(qs)
             if unknown:
-                raise PipelineError(f"unknown question ids: {sorted(unknown)}")
+                raise PipelineError(f"{len(unknown)} unknown question id(s)")
             surv, exact = surviving_clusters(run["clusters"], chosen_sets)
             clusters = {c["id"]: c for c in run["clusters"]}
             best = max(surv, key=lambda c: clusters[c]["size"])
@@ -599,8 +600,8 @@ class SpecFork:
             self._log(run, "resolve", f"Locked {len(locked)} executable test cases ({len(left_open)} undecided case(s) left open)")
         except PipelineError as e:
             run["status"] = "awaiting_answers"
-            run["error"] = str(e)
-            self._log(run, "resolve", f"Could not resolve: {e}")
+            run["error"] = str(e)[:300]
+            self._log(run, "resolve", f"Could not resolve: {str(e)[:200]}")
             raise
         finally:
             run["metrics"]["wall_time_s"] = round(run["metrics"]["wall_time_s"] + time.perf_counter() - t0, 2)

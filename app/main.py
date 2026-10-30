@@ -11,11 +11,12 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .llm import MODEL_DEEP, MODEL_FAST, NebiusClient
 from .pipeline import PipelineError, SpecFork, new_run, summarize
 from .presets import PRESETS
+from .sandbox import selftest as sandbox_selftest
 from .store import RateLimiter, RunStore
 
 VERSION = "1.0.0"
@@ -71,7 +72,8 @@ async def security_headers(request: Request, call_next):
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
     return response
-store = RunStore(os.environ.get("RUNS_DIR", "/tmp/specfork-runs"))
+store = RunStore(os.environ.get("RUNS_DIR") or None)  # memory only unless RUNS_DIR is set
+answer_limiter = RateLimiter(per_window=20, window_s=600, daily_budget_usd=float("inf"))
 limiter = RateLimiter(
     per_window=int(os.environ.get("RATE_LIMIT_RUNS", "6")),
     window_s=float(os.environ.get("RATE_LIMIT_WINDOW_S", "600")),
@@ -96,7 +98,14 @@ class CreateRun(BaseModel):
 
 
 class Answers(BaseModel):
-    answers: dict[str, str] = Field(default_factory=dict)
+    answers: dict[str, str] = Field(default_factory=dict, max_length=20)
+
+    @field_validator("answers")
+    @classmethod
+    def _small(cls, v: dict[str, str]) -> dict[str, str]:
+        if any(len(k) > 32 or len(x) > 64 for k, x in v.items()):
+            raise ValueError("answer ids too long")
+        return v
 
 
 class Converge(BaseModel):
@@ -111,20 +120,33 @@ def _client_id(request: Request) -> str:
     return last[:64] or (request.client.host if request.client else "unknown")
 
 
-def _spawn(coro: Any, run: dict[str, Any]) -> None:
+# Spend is reserved when work is admitted (so concurrent requests cannot overshoot the daily cap)
+# and trued up with the metered cost when the work finishes.
+RESERVE_RUN_USD, RESERVE_ANSWER_USD, RESERVE_CONVERGE_USD = 0.08, 0.02, 0.04
+_owners: dict[str, str] = {}  # run id -> creator's client id (kept out of the run JSON)
+
+
+def _spawn(coro: Any, run: dict[str, Any], reserve_usd: float = 0.0) -> None:
     cost0 = run["metrics"]["total_cost_usd"]
+    limiter.add_spend(reserve_usd)
 
     async def wrapper() -> None:
         try:
             await coro
         finally:
-            limiter.add_spend(run["metrics"]["total_cost_usd"] - cost0)
+            limiter.add_spend(run["metrics"]["total_cost_usd"] - cost0 - reserve_usd)
             store.touch(run)
             store.persist(run)
 
     t = asyncio.create_task(wrapper())
     _tasks.add(t)
     t.add_done_callback(_tasks.discard)
+
+
+def _require_owner(run: dict[str, Any], request: Request) -> None:
+    owner = _owners.get(run["id"])
+    if owner is not None and owner != _client_id(request):
+        raise HTTPException(403, "Only the visitor who started this run can answer or re-fork it. Fork the spec to run your own.")
 
 
 def _get(run_id: str) -> dict[str, Any]:
@@ -136,10 +158,16 @@ def _get(run_id: str) -> dict[str, Any]:
     return run
 
 
+_sandbox_status: dict[str, Any] = {}
+
+
 @app.get("/api/health")
 async def health() -> dict[str, Any]:
+    if not _sandbox_status:
+        _sandbox_status.update(await sandbox_selftest())
     return {"ok": True, "llm_configured": client.configured, "models": {"fast": MODEL_FAST, "deep": MODEL_DEEP},
-            "provider": "Nebius Token Factory", "version": VERSION}
+            "provider": "Nebius Token Factory", "version": VERSION,
+            "sandbox": {"ok": _sandbox_status.get("ok"), "net_isolated": _sandbox_status.get("net_isolated")}}
 
 
 @app.get("/api/presets")
@@ -165,9 +193,13 @@ async def create_run(body: CreateRun, request: Request) -> dict[str, str]:
     if msg:
         raise HTTPException(429, msg)
     spec = body.spec.replace("\x00", "").strip()
-    run = new_run(secrets.token_urlsafe(9), spec, body.n_samples, body.preset_id)
+    run = new_run(secrets.token_urlsafe(12), spec, body.n_samples, body.preset_id)
     store.add(run)
-    _spawn(engine.run_all(run), run)
+    _owners[run["id"]] = _client_id(request)
+    if len(_owners) > 2000:
+        for k in list(_owners)[:500]:
+            _owners.pop(k, None)
+    _spawn(engine.run_all(run), run, RESERVE_RUN_USD)
     return {"id": run["id"]}
 
 
@@ -177,23 +209,30 @@ async def get_run(run_id: str) -> dict[str, Any]:
 
 
 ACTIVE = {"running", "resolving", "converging"}
-MAX_SSE = int(os.environ.get("MAX_SSE", "200"))
+MAX_SSE = int(os.environ.get("MAX_SSE", "40"))
+MAX_SSE_PER_CLIENT = 4
 _sse_open = [0]
+_sse_by_client: dict[str, int] = {}
 
 
 @app.get("/api/runs/{run_id}/events")
 async def run_events(run_id: str, request: Request) -> StreamingResponse:
     run = _get(run_id)
-    if _sse_open[0] >= MAX_SSE:
+    cid = _client_id(request)
+    if _sse_open[0] >= MAX_SSE or _sse_by_client.get(cid, 0) >= MAX_SSE_PER_CLIENT:
         raise HTTPException(503, "Too many open event streams; the client will fall back to polling.")
+    _sse_open[0] += 1
+    _sse_by_client[cid] = _sse_by_client.get(cid, 0) + 1
 
     async def gen():
-        _sse_open[0] += 1
         try:
             async for chunk in _gen():
                 yield chunk
         finally:
             _sse_open[0] -= 1
+            _sse_by_client[cid] -= 1
+            if _sse_by_client[cid] <= 0:
+                _sse_by_client.pop(cid, None)
 
     async def _gen():
         last = -1
@@ -225,12 +264,16 @@ async def run_events(run_id: str, request: Request) -> StreamingResponse:
 
 
 @app.post("/api/runs/{run_id}/answers")
-async def answer(run_id: str, body: Answers) -> dict[str, Any]:
+async def answer(run_id: str, body: Answers, request: Request) -> dict[str, Any]:
     run = _get(run_id)
     if run.get("is_sample"):
         raise HTTPException(409, "This is a recorded sample run. Fork the spec to run it live.")
+    _require_owner(run, request)
     if run["status"] not in ("awaiting_answers", "resolved"):
         raise HTTPException(409, f"run is {run['status']}")
+    msg = answer_limiter.check(_client_id(request)) or limiter.budget_message()
+    if msg:
+        raise HTTPException(429, msg)
     run.pop("error", None)
     run["status"] = "resolving"
     store.touch(run)
@@ -241,7 +284,7 @@ async def answer(run_id: str, body: Answers) -> dict[str, Any]:
         except PipelineError:
             pass
 
-    _spawn(go(), run)
+    _spawn(go(), run, RESERVE_ANSWER_USD)
     return run
 
 
@@ -252,12 +295,13 @@ async def converge(run_id: str, body: Converge, request: Request) -> dict[str, A
         raise HTTPException(409, "This is a recorded sample run. Fork the spec to run it live.")
     if run["status"] != "resolved" or not run.get("resolution"):
         raise HTTPException(409, "resolve the run first")
+    _require_owner(run, request)
     msg = limiter.check(_client_id(request))
     if msg:
         raise HTTPException(429, msg)
     run["status"] = "converging"
     store.touch(run)
-    _spawn(engine.converge(run, body.n_samples or run["settings"]["n_samples"]), run)
+    _spawn(engine.converge(run, body.n_samples or run["settings"]["n_samples"]), run, RESERVE_CONVERGE_USD)
     return run
 
 

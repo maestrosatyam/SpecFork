@@ -13,7 +13,7 @@ try:
     import resource
 
     resource.setrlimit(resource.RLIMIT_CPU, (15, 16))
-    resource.setrlimit(resource.RLIMIT_AS, (768 * 1024 * 1024, 768 * 1024 * 1024))
+    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
     resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
     resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
@@ -90,6 +90,15 @@ def _alarm(signum, frame):
 
 def main():
     req = json.loads(sys.stdin.read())
+    if req.get("require_isolation") and not NET_ISOLATED:
+        sys.stdout.write(json.dumps({"ok": False, "error": "sandbox isolation unavailable on this host"}))
+        return
+    try:  # no new processes from here on (fork bombs, subprocess, surviving grandchildren)
+        import resource as _r
+
+        _r.setrlimit(_r.RLIMIT_NPROC, (0, 0))
+    except Exception:
+        pass
     allowed = set(req["allowed_imports"])
     real_import = builtins.__import__
 
@@ -162,8 +171,9 @@ def main():
         try:
             signal.setitimer(signal.ITIMER_REAL, float(req["timeout"]))
             val = fn(**args)
+            rep = canon(val)[:2000]  # still under the timer: canonicalising hostile values can be slow
             signal.setitimer(signal.ITIMER_REAL, 0)
-            outcomes[item["id"]] = {"ok": True, "value_repr": canon(val)[:2000]}
+            outcomes[item["id"]] = {"ok": True, "value_repr": rep}
         except _Timeout:
             outcomes[item["id"]] = {"ok": False, "value_repr": "raises", "error_type": "Timeout", "error_msg": "exceeded time limit"}
         except MemoryError:
@@ -175,7 +185,7 @@ def main():
         except Exception as e:  # noqa: BLE001
             signal.setitimer(signal.ITIMER_REAL, 0)
             outcomes[item["id"]] = {"ok": False, "value_repr": "raises", "error_type": type(e).__name__, "error_msg": str(e)[:200]}
-    sys.stdout.write(json.dumps({"ok": True, "outcomes": outcomes}))
+    sys.stdout.write(json.dumps({"ok": True, "outcomes": outcomes, "net_isolated": NET_ISOLATED}))
 
 
 main()

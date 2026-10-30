@@ -113,3 +113,22 @@ async def test_rate_limit_uses_rightmost_forwarded_for(api):
         codes.append(r.status_code)
     assert codes[3] == 429
     await asyncio.wait_for(asyncio.gather(*list(main._tasks)), timeout=30)
+
+
+async def test_answers_are_bounded_and_owner_only(api):
+    h_owner = {"x-forwarded-for": "198.51.100.1"}
+    rid = (await api.post("/api/runs", json={"spec": SPEC, "n_samples": 4}, headers=h_owner)).json()["id"]
+    await asyncio.wait_for(asyncio.gather(*list(main._tasks)), timeout=30)
+    big = {f"q{i}": "x" for i in range(25)}
+    assert (await api.post(f"/api/runs/{rid}/answers", json={"answers": big}, headers=h_owner)).status_code == 422
+    assert (await api.post(f"/api/runs/{rid}/answers", json={"answers": {"q0": "x" * 5000}}, headers=h_owner)).status_code == 422
+    other = {"x-forwarded-for": "198.51.100.99"}
+    assert (await api.post(f"/api/runs/{rid}/answers", json={"answers": {}}, headers=other)).status_code == 403
+    assert (await api.post(f"/api/runs/{rid}/converge", json={}, headers=other)).status_code in (403, 409)
+    run = (await api.get(f"/api/runs/{rid}")).json()
+    assert "198.51.100.1" not in str(run)  # creator address is never part of the public run JSON
+
+
+async def test_health_reports_sandbox(api):
+    h = (await api.get("/api/health")).json()
+    assert h["sandbox"]["ok"] is True
