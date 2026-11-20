@@ -31,8 +31,8 @@ docs = ["mkdocs-material>=9.5"]
 dev = [
   "specfork[server,mcp]",
   "pytest==9.2.0",
-  "pytest-asyncio==1.4.1",
-  "ruff==0.8.4",
+  "pytest-asyncio==1.5.0",
+  "ruff==0.17.5",
   "basedpyright==1.40.2",
 ]
 
